@@ -10,3 +10,7 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+
+jwt:
+  secret: algoarena-dev-secret-change-before-any-deployment-0123456789
+  expiration-ms: 86400000
