@@ -14,3 +14,8 @@ spring:
 jwt:
   secret: algoarena-dev-secret-change-before-any-deployment-0123456789
   expiration-ms: 86400000
+
+algoarena:
+  execution:
+    max-runtime-seconds: 30
+    workers-base-path: ../workers
