@@ -8,10 +8,10 @@ const SAMPLE = [
     { id: 4, duration: 2 }
 ];
 
-function randomJobs(count) {
+function randomJobs(count, min, max) {
     return Array.from({ length: count }, (_, index) => ({
         id: index + 1,
-        duration: 5 + Math.floor(Math.random() * 56)
+        duration: min + Math.floor(Math.random() * (max - min + 1))
     }));
 }
 
@@ -20,11 +20,13 @@ export default function DatasetForm({ onRaceCreated }) {
     const [machineCount, setMachineCount] = useState(2);
     const [jobsText, setJobsText] = useState(JSON.stringify(SAMPLE, null, 2));
     const [randomCount, setRandomCount] = useState(20);
+    const [difficulty, setDifficulty] = useState('easy');
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
 
     function fillRandom() {
-        setJobsText(JSON.stringify(randomJobs(Number(randomCount)), null, 2));
+        const [min, max] = difficulty === 'easy' ? [5, 60] : [1000, 100000];
+        setJobsText(JSON.stringify(randomJobs(Number(randomCount), min, max), null, 2));
     }
 
     async function submit(event) {
@@ -71,6 +73,10 @@ export default function DatasetForm({ onRaceCreated }) {
                     value={randomCount}
                     onChange={(e) => setRandomCount(e.target.value)}
                 />
+                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                    <option value="easy">Easy (5 to 60)</option>
+                    <option value="hard">Hard (1000 to 100000)</option>
+                </select>
                 <button type="button" className="secondary" onClick={fillRandom}>Fill with random jobs</button>
             </div>
             {error && <p className="error">{error}</p>}
