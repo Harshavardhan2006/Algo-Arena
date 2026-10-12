@@ -25,7 +25,7 @@ export default function DatasetForm({ onRaceCreated }) {
     const [busy, setBusy] = useState(false);
 
     function fillRandom() {
-        const [min, max] = difficulty === 'easy' ? [5, 60] : [1000, 100000];
+        const [min, max] = difficulty === 'easy' ? [5, 60] : [1000000, 100000000];
         setJobsText(JSON.stringify(randomJobs(Number(randomCount), min, max), null, 2));
     }
 
@@ -75,7 +75,7 @@ export default function DatasetForm({ onRaceCreated }) {
                 />
                 <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
                     <option value="easy">Easy (5 to 60)</option>
-                    <option value="hard">Hard (1000 to 100000)</option>
+                    <option value="hard">Hard (1,000,000 to 100,000,000)</option>
                 </select>
                 <button type="button" className="secondary" onClick={fillRandom}>Fill with random jobs</button>
             </div>
