@@ -1,7 +1,13 @@
 const fs = require('fs');
 
 const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const started = process.hrtime.bigint();
+const begin = process.hrtime.bigint();
+let emitNs = 0n;
+function emit(event) {
+    const before = process.hrtime.bigint();
+    console.log(JSON.stringify(event));
+    emitNs += process.hrtime.bigint() - before;
+}
 const machineCount = input.machineCount;
 const jobs = [...input.jobs].sort((a, b) => b.duration - a.duration);
 const n = jobs.length;
@@ -25,12 +31,12 @@ const totalWork = jobs.reduce((sum, job) => sum + job.duration, 0);
 const lowerBound = Math.max(jobs[0].duration, totalWork / machineCount);
 
 function report() {
-    console.log(JSON.stringify({
+    emit({
         type: 'progress',
         iteration: nodes,
         score: best,
         payload: { nodes }
-    }));
+    });
 }
 
 report();
@@ -67,7 +73,7 @@ function search(index, load, assignment) {
 
 search(0, new Array(machineCount).fill(0), []);
 
-const computeMs = Number(process.hrtime.bigint() - started) / 1e6;
+const computeMs = Number(process.hrtime.bigint() - begin - emitNs) / 1e6;
 
 console.log(JSON.stringify({
     type: 'final',

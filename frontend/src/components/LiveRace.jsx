@@ -90,7 +90,7 @@ export default function LiveRace({ raceId }) {
                         <th>Algorithm</th>
                         <th>Status</th>
                         <th>Best makespan</th>
-                        <th>Iterations</th>
+                        <th title="Greedy counts jobs placed, branch and bound counts search nodes explored, so values are not comparable across algorithms">Steps</th>
                         <th>Wall time (ms)</th>
                         <th>Compute time (ms)</th>
                     </tr>

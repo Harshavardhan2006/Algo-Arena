@@ -1,7 +1,13 @@
 const fs = require('fs');
 
 const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const started = process.hrtime.bigint();
+const begin = process.hrtime.bigint();
+let emitNs = 0n;
+function emit(event) {
+    const before = process.hrtime.bigint();
+    console.log(JSON.stringify(event));
+    emitNs += process.hrtime.bigint() - before;
+}
 const machineCount = input.machineCount;
 const jobs = [...input.jobs].sort((a, b) => a.duration - b.duration);
 
@@ -16,15 +22,15 @@ jobs.forEach((job, index) => {
     assignment.push({ jobId: job.id, machine: target, startTime: load[target] });
     load[target] += job.duration;
 
-    console.log(JSON.stringify({
+    emit({
         type: 'progress',
         iteration: index + 1,
         score: Math.max(...load),
         payload: { jobId: job.id, machine: target }
-    }));
+    });
 });
 
-const computeMs = Number(process.hrtime.bigint() - started) / 1e6;
+const computeMs = Number(process.hrtime.bigint() - begin - emitNs) / 1e6;
 
 console.log(JSON.stringify({
     type: 'final',
