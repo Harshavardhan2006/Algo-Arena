@@ -1,8 +1,7 @@
 const fs = require('fs');
 
-const started = process.hrtime.bigint();
-
 const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const started = process.hrtime.bigint();
 const machineCount = input.machineCount;
 const jobs = [...input.jobs].sort((a, b) => b.duration - a.duration);
 const n = jobs.length;

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.UUID;
 
 @Service
 public class ExecutionService {
@@ -33,8 +34,14 @@ public class ExecutionService {
     @Value("${algoarena.execution.max-runtime-seconds}")
     private long maxRuntimeSeconds;
 
-    @Value("${algoarena.execution.workers-base-path}")
-    private String workersBasePath;
+    @Value("${algoarena.execution.docker-image}")
+    private String dockerImage;
+
+    @Value("${algoarena.execution.memory-limit}")
+    private String memoryLimit;
+
+    @Value("${algoarena.execution.cpu-limit}")
+    private String cpuLimit;
 
     public ExecutionService(RunRepository runRepository, RaceRepository raceRepository,
                             SimpMessagingTemplate messagingTemplate, ObjectMapper objectMapper) {
@@ -70,9 +77,22 @@ public class ExecutionService {
             String json = objectMapper.writeValueAsString(run.getRace().getDataset().getRawInput());
             Files.writeString(inputFile, json, StandardCharsets.UTF_8);
 
-            Path entrypoint = Path.of(workersBasePath, run.getAlgorithm().getWorkerEntrypoint())
-                    .toAbsolutePath().normalize();
-            ProcessBuilder builder = new ProcessBuilder("node", entrypoint.toString(), inputFile.toString());
+            String containerName = "algoarena-" + runId + "-" + UUID.randomUUID().toString().substring(0, 8);
+            ProcessBuilder builder = new ProcessBuilder(
+                    "docker", "run", "--rm",
+                    "--name", containerName,
+                    "--memory", memoryLimit,
+                    "--memory-swap", memoryLimit,
+                    "--cpus", cpuLimit,
+                    "--pids-limit", "64",
+                    "--network", "none",
+                    "--read-only",
+                    "--tmpfs", "/tmp",
+                    "--cap-drop", "ALL",
+                    "--security-opt", "no-new-privileges",
+                    "-v", inputFile.toAbsolutePath() + ":/input.json:ro",
+                    dockerImage,
+                    "node", "/app/workers/" + run.getAlgorithm().getWorkerEntrypoint(), "/input.json");
             builder.redirectErrorStream(true);
             Process process = builder.start();
 
@@ -80,6 +100,7 @@ public class ExecutionService {
                 try {
                     if (!process.waitFor(maxRuntimeSeconds, TimeUnit.SECONDS)) {
                         timedOut.set(true);
+                        killContainer(containerName);
                         process.destroyForcibly();
                     }
                 } catch (InterruptedException e) {
@@ -168,6 +189,16 @@ public class ExecutionService {
             raceRepository.save(race);
         });
         send(raceId, new RunProgressEvent(null, null, "race_completed", null, null, null, null, null));
+    }
+
+    private void killContainer(String name) {
+        try {
+            new ProcessBuilder("docker", "rm", "-f", name)
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor(10, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+        }
     }
 
     private void send(Long raceId, RunProgressEvent event) {

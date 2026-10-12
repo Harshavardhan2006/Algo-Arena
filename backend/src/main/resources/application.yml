@@ -19,3 +19,6 @@ algoarena:
   execution:
     max-runtime-seconds: 30
     workers-base-path: ../workers
+    docker-image: algoarena-worker:latest
+    memory-limit: 256m
+    cpu-limit: "1"
