@@ -1,6 +1,7 @@
 package com.algoarena.execution;
 
 public record RunProgressEvent(
+        Long eventId,
         Long runId,
         String algorithmCode,
         String type,
@@ -8,5 +9,6 @@ public record RunProgressEvent(
         Double score,
         Long elapsedMs,
         Double computeMs,
-        Object payload) {
+        Double progress,
+        Object stats) {
 }

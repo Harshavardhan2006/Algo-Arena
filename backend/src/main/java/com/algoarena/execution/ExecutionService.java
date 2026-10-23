@@ -1,7 +1,9 @@
 package com.algoarena.execution;
 
 import com.algoarena.model.Run;
+import com.algoarena.model.RunEvent;
 import com.algoarena.repository.RaceRepository;
+import com.algoarena.repository.RunEventRepository;
 import com.algoarena.repository.RunRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,17 +19,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.UUID;
 
 @Service
 public class ExecutionService {
 
     private final RunRepository runRepository;
     private final RaceRepository raceRepository;
+    private final RunEventRepository runEventRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
 
@@ -44,9 +48,11 @@ public class ExecutionService {
     private String cpuLimit;
 
     public ExecutionService(RunRepository runRepository, RaceRepository raceRepository,
+                            RunEventRepository runEventRepository,
                             SimpMessagingTemplate messagingTemplate, ObjectMapper objectMapper) {
         this.runRepository = runRepository;
         this.raceRepository = raceRepository;
+        this.runEventRepository = runEventRepository;
         this.messagingTemplate = messagingTemplate;
         this.objectMapper = objectMapper;
     }
@@ -60,17 +66,33 @@ public class ExecutionService {
         run.setStatus("running");
         run.setStartedAt(Instant.now());
         runRepository.save(run);
-        send(raceId, new RunProgressEvent(runId, code, "started", 0, null, 0L, null, null));
+
+        RunEvent startedEvent = new RunEvent();
+        startedEvent.setRunId(runId);
+        startedEvent.setEventTime(Instant.now());
+        startedEvent.setIteration(0);
+        startedEvent.setCurrentScore(null);
+        startedEvent.setElapsedMs(0L);
+        startedEvent.setEventType("started");
+        startedEvent = runEventRepository.save(startedEvent);
+        send(raceId, new RunProgressEvent(startedEvent.getId(), runId, code, "started", 0, null, 0L, null, null, null));
 
         long begin = System.currentTimeMillis();
         Path inputFile = null;
         boolean sawFinal = false;
         Double finalScore = null;
         Integer finalIteration = null;
+        Double lastScore = null;
+        Integer lastIteration = null;
         Double computeMs = null;
         Map<String, Object> finalPayload = null;
         AtomicBoolean timedOut = new AtomicBoolean(false);
         String failure = null;
+
+        int keptCount = 1;
+        Double lastKeptScore = null;
+        Long lastKeptElapsedMs = 0L;
+        boolean firstWorkerEvent = true;
 
         try {
             inputFile = Files.createTempFile("algoarena-", ".json");
@@ -128,7 +150,19 @@ public class ExecutionService {
                     Integer iteration = event.hasNonNull("iteration") ? event.get("iteration").asInt() : null;
                     Double score = event.hasNonNull("score") ? event.get("score").asDouble() : null;
                     Double compute = event.hasNonNull("computeMs") ? event.get("computeMs").asDouble() : null;
+                    Double progress = event.hasNonNull("progress") ? event.get("progress").asDouble() : null;
+                    JsonNode statsNode = event.get("stats");
+                    Map<String, Object> stats = (statsNode != null && statsNode.isObject())
+                            ? objectMapper.convertValue(statsNode, new TypeReference<Map<String, Object>>() {})
+                            : null;
                     JsonNode payload = event.get("payload");
+
+                    if (score != null) {
+                        lastScore = score;
+                    }
+                    if (iteration != null) {
+                        lastIteration = iteration;
+                    }
 
                     if ("final".equals(type)) {
                         sawFinal = true;
@@ -140,8 +174,56 @@ public class ExecutionService {
                         }
                     }
 
-                    send(raceId, new RunProgressEvent(runId, code, type, iteration, score,
-                            System.currentTimeMillis() - begin, compute, payload));
+                    long elapsed = System.currentTimeMillis() - begin;
+
+                    boolean keep = false;
+                    if ("final".equals(type)) {
+                        keep = true;
+                    } else if (keptCount < 3000) {
+                        if (firstWorkerEvent) {
+                            keep = true;
+                        } else if (score != null && (lastKeptScore == null || score < lastKeptScore)) {
+                            keep = true;
+                        } else if (lastKeptElapsedMs != null && (elapsed - lastKeptElapsedMs >= 1000)) {
+                            keep = true;
+                        }
+                    }
+
+                    if (firstWorkerEvent) {
+                        firstWorkerEvent = false;
+                    }
+
+                    if (keep) {
+                        keptCount++;
+                        if (score != null && (lastKeptScore == null || score < lastKeptScore)) {
+                            lastKeptScore = score;
+                        }
+                        lastKeptElapsedMs = elapsed;
+
+                        Map<String, Object> payloadMap = new LinkedHashMap<>();
+                        if (stats != null) {
+                            payloadMap.put("stats", stats);
+                        }
+                        if (progress != null) {
+                            payloadMap.put("progress", progress);
+                        }
+                        if (compute != null) {
+                            payloadMap.put("computeMs", compute);
+                        }
+
+                        RunEvent runEvent = new RunEvent();
+                        runEvent.setRunId(runId);
+                        runEvent.setEventTime(Instant.now());
+                        runEvent.setIteration(iteration);
+                        runEvent.setCurrentScore(score);
+                        runEvent.setElapsedMs(elapsed);
+                        runEvent.setEventType(type);
+                        runEvent.setPayload(payloadMap.isEmpty() ? null : payloadMap);
+                        runEvent = runEventRepository.save(runEvent);
+
+                        send(raceId, new RunProgressEvent(runEvent.getId(), runId, code, type, iteration, score,
+                                elapsed, compute, progress, stats));
+                    }
                 }
             }
 
@@ -150,12 +232,33 @@ public class ExecutionService {
 
             if (timedOut.get()) {
                 run.setStatus("timed_out");
-                send(raceId, new RunProgressEvent(runId, code, "timed_out", null, null,
-                        System.currentTimeMillis() - begin, null, null));
+                run.setFinalScore(lastScore);
+                run.setIterations(lastIteration);
+                run.setRuntimeMs(System.currentTimeMillis() - begin);
+                long elapsed = System.currentTimeMillis() - begin;
+                RunEvent event = new RunEvent();
+                event.setRunId(runId);
+                event.setEventTime(Instant.now());
+                event.setIteration(lastIteration);
+                event.setCurrentScore(lastScore);
+                event.setElapsedMs(elapsed);
+                event.setEventType("timed_out");
+                event = runEventRepository.save(event);
+                send(raceId, new RunProgressEvent(event.getId(), runId, code, "timed_out", lastIteration, lastScore,
+                        elapsed, null, null, null));
             } else if (exitCode != 0 || !sawFinal) {
                 run.setStatus("failed");
-                send(raceId, new RunProgressEvent(runId, code, "failed", null, null,
-                        System.currentTimeMillis() - begin, null, null));
+                long elapsed = System.currentTimeMillis() - begin;
+                RunEvent event = new RunEvent();
+                event.setRunId(runId);
+                event.setEventTime(Instant.now());
+                event.setIteration(lastIteration);
+                event.setCurrentScore(lastScore);
+                event.setElapsedMs(elapsed);
+                event.setEventType("failed");
+                event = runEventRepository.save(event);
+                send(raceId, new RunProgressEvent(event.getId(), runId, code, "failed", lastIteration, lastScore,
+                        elapsed, null, null, null));
             } else {
                 run.setStatus("completed");
                 run.setFinalScore(finalScore);
@@ -166,8 +269,17 @@ public class ExecutionService {
         } catch (Exception e) {
             failure = e.getMessage();
             run.setStatus("failed");
-            send(raceId, new RunProgressEvent(runId, code, "failed", null, null,
-                    System.currentTimeMillis() - begin, null, failure));
+            long elapsed = System.currentTimeMillis() - begin;
+            RunEvent event = new RunEvent();
+            event.setRunId(runId);
+            event.setEventTime(Instant.now());
+            event.setIteration(lastIteration);
+            event.setCurrentScore(lastScore);
+            event.setElapsedMs(elapsed);
+            event.setEventType("failed");
+            event = runEventRepository.save(event);
+            send(raceId, new RunProgressEvent(event.getId(), runId, code, "failed", lastIteration, lastScore,
+                    elapsed, null, null, null));
         } finally {
             run.setCompletedAt(Instant.now());
             runRepository.save(run);
@@ -188,7 +300,7 @@ public class ExecutionService {
             race.setCompletedAt(Instant.now());
             raceRepository.save(race);
         });
-        send(raceId, new RunProgressEvent(null, null, "race_completed", null, null, null, null, null));
+        send(raceId, new RunProgressEvent(null, null, null, "race_completed", null, null, null, null, null, null));
     }
 
     private void killContainer(String name) {

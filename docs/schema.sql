@@ -65,6 +65,7 @@ CREATE TABLE run_events (
     iteration INT,
     current_score DOUBLE PRECISION,
     elapsed_ms BIGINT,
+    event_type VARCHAR(20),
     payload JSONB
 );
 

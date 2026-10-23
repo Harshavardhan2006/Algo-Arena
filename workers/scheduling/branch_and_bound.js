@@ -30,28 +30,33 @@ let nodes = 0;
 const totalWork = jobs.reduce((sum, job) => sum + job.duration, 0);
 const lowerBound = Math.max(jobs[0].duration, totalWork / machineCount);
 
-function report() {
+let lastReport = 0;
+
+function report(force = false) {
+    const now = Date.now();
+    if (!force && now - lastReport < 250) return;
+    lastReport = now;
     emit({
         type: 'progress',
         iteration: nodes,
         score: best,
-        payload: { nodes }
+        stats: { nodes, lowerBound }
     });
 }
 
-report();
+report(true);
 
 function search(index, load, assignment) {
     if (best <= lowerBound) return;
     nodes++;
-    if (nodes % 20000 === 0) report();
+    if (nodes % 20000 === 0) report(false);
 
     if (index === n) {
         const makespan = Math.max(...load);
         if (makespan < best) {
             best = makespan;
             bestAssignment = assignment.slice();
-            report();
+            report(false);
         }
         return;
     }
@@ -80,5 +85,6 @@ console.log(JSON.stringify({
     iteration: nodes,
     score: best,
     computeMs,
+    stats: { nodes, lowerBound },
     payload: { assignment: bestAssignment, nodes }
 }));

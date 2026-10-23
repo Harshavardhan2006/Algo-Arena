@@ -25,8 +25,9 @@ jobs.forEach((job, index) => {
     emit({
         type: 'progress',
         iteration: index + 1,
-        score: Math.max(...load),
-        payload: { jobId: job.id, machine: target }
+        score: null,
+        progress: (index + 1) / jobs.length,
+        stats: { jobsPlaced: index + 1, totalJobs: jobs.length }
     });
 });
 
@@ -37,5 +38,7 @@ console.log(JSON.stringify({
     iteration: jobs.length,
     score: Math.max(...load),
     computeMs,
+    progress: 1,
+    stats: { jobsPlaced: jobs.length, totalJobs: jobs.length },
     payload: { assignment, machineLoad: load }
 }));

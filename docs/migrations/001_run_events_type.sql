@@ -1,0 +1,1 @@
+ALTER TABLE run_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(20);
