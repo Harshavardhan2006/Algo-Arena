@@ -150,18 +150,44 @@ public class ExecutionService {
                     "node", "/app/workers/" + run.getAlgorithm().getWorkerEntrypoint(), "/input.json");
             builder.redirectErrorStream(true);
             runningContainers.put(runId, containerName);
-            Process process = builder.start();
             if (cancelledRaces.contains(raceId)) {
-                killContainer(containerName);
+                run.setStatus("cancelled");
+                run.setCompletedAt(Instant.now());
+                runRepository.save(run);
+                RunEvent event = new RunEvent();
+                event.setRunId(runId);
+                event.setEventTime(Instant.now());
+                event.setIteration(0L);
+                event.setCurrentScore(null);
+                event.setElapsedMs(0L);
+                event.setEventType("cancelled");
+                event = runEventRepository.save(event);
+                send(raceId, new RunProgressEvent(event.getId(), runId, code, "cancelled", 0L, null, 0L, null, null, null));
+                closeRaceIfDone(raceId);
+                runningContainers.remove(runId);
+                return;
             }
+            Process process = builder.start();
 
             long timeLimit = run.getRace().getTimeLimitSeconds();
             Thread watchdog = new Thread(() -> {
+                long watchdogStart = System.currentTimeMillis();
+                long lastKillAttempt = 0L;
                 try {
-                    if (!process.waitFor(timeLimit, TimeUnit.SECONDS)) {
-                        timedOut.set(true);
-                        killContainer(containerName);
-                        process.destroyForcibly();
+                    while (process.isAlive()) {
+                        if (cancelledRaces.contains(raceId)) {
+                            long now = System.currentTimeMillis();
+                            if (now - lastKillAttempt >= 500) {
+                                killContainer(containerName);
+                                lastKillAttempt = now;
+                            }
+                        } else if (System.currentTimeMillis() - watchdogStart > timeLimit * 1000L) {
+                            timedOut.set(true);
+                            killContainer(containerName);
+                            process.destroyForcibly();
+                            break;
+                        }
+                        Thread.sleep(100);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
