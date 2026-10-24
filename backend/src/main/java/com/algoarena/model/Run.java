@@ -42,7 +42,7 @@ public class Run {
     @Column(name = "peak_memory_kb")
     private Long peakMemoryKb;
 
-    private Integer iterations;
+    private Long iterations;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "result_output")
@@ -65,8 +65,8 @@ public class Run {
     public void setRuntimeMs(Long runtimeMs) { this.runtimeMs = runtimeMs; }
     public Long getPeakMemoryKb() { return peakMemoryKb; }
     public void setPeakMemoryKb(Long peakMemoryKb) { this.peakMemoryKb = peakMemoryKb; }
-    public Integer getIterations() { return iterations; }
-    public void setIterations(Integer iterations) { this.iterations = iterations; }
+    public Long getIterations() { return iterations; }
+    public void setIterations(Long iterations) { this.iterations = iterations; }
     public Map<String, Object> getResultOutput() { return resultOutput; }
     public void setResultOutput(Map<String, Object> resultOutput) { this.resultOutput = resultOutput; }
 }

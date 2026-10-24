@@ -43,7 +43,7 @@ public class RaceController {
             String paradigm,
             String status,
             Double score,
-            Integer iterations,
+            Long iterations,
             Long elapsedMs,
             Long computeMs,
             Double progress,
@@ -153,7 +153,7 @@ public class RaceController {
             RunEvent lastEvent = runEventRepository.findFirstByRunIdOrderByIdDesc(run.getId());
             Double score = run.getFinalScore() != null ? run.getFinalScore()
                     : (lastEvent != null ? lastEvent.getCurrentScore() : null);
-            Integer iterations = run.getIterations() != null ? run.getIterations()
+            Long iterations = run.getIterations() != null ? run.getIterations()
                     : (lastEvent != null ? lastEvent.getIteration() : null);
             Long elapsedMs = lastEvent != null ? lastEvent.getElapsedMs() : null;
             Long computeMs = run.getRuntimeMs();

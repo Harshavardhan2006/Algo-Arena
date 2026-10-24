@@ -55,7 +55,7 @@ CREATE TABLE runs (
     final_score DOUBLE PRECISION,
     runtime_ms BIGINT,
     peak_memory_kb BIGINT,
-    iterations INT,
+    iterations BIGINT,
     result_output JSONB
 );
 
@@ -63,7 +63,7 @@ CREATE TABLE run_events (
     id BIGSERIAL PRIMARY KEY,
     run_id BIGINT NOT NULL REFERENCES runs(id),
     event_time TIMESTAMP NOT NULL DEFAULT now(),
-    iteration INT,
+    iteration BIGINT,
     current_score DOUBLE PRECISION,
     elapsed_ms BIGINT,
     event_type VARCHAR(20),

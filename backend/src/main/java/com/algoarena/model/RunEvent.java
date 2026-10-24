@@ -25,7 +25,7 @@ public class RunEvent {
     @Column(name = "event_time", nullable = false)
     private Instant eventTime = Instant.now();
 
-    private Integer iteration;
+    private Long iteration;
 
     @Column(name = "current_score")
     private Double currentScore;
@@ -46,8 +46,8 @@ public class RunEvent {
     public void setRunId(Long runId) { this.runId = runId; }
     public Instant getEventTime() { return eventTime; }
     public void setEventTime(Instant eventTime) { this.eventTime = eventTime; }
-    public Integer getIteration() { return iteration; }
-    public void setIteration(Integer iteration) { this.iteration = iteration; }
+    public Long getIteration() { return iteration; }
+    public void setIteration(Long iteration) { this.iteration = iteration; }
     public Double getCurrentScore() { return currentScore; }
     public void setCurrentScore(Double currentScore) { this.currentScore = currentScore; }
     public Long getElapsedMs() { return elapsedMs; }

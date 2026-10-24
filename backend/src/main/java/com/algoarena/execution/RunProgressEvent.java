@@ -5,7 +5,7 @@ public record RunProgressEvent(
         Long runId,
         String algorithmCode,
         String type,
-        Integer iteration,
+        Long iteration,
         Double score,
         Long elapsedMs,
         Double computeMs,

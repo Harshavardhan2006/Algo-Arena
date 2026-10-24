@@ -60,10 +60,6 @@ public class RaceService {
         return Optional.of(race);
     }
 
-    public Optional<Race> create(Long datasetId, String username) {
-        return create(datasetId, username, 30);
-    }
-
     public void start(Race race) {
         race.setStatus("running");
         race.setStartedAt(Instant.now());
