@@ -18,6 +18,7 @@ jwt:
 algoarena:
   execution:
     max-runtime-seconds: 30
+    max-time-limit-seconds: 600
     workers-base-path: ../workers
     docker-image: algoarena-worker:latest
     memory-limit: 256m

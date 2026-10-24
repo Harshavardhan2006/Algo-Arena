@@ -61,10 +61,15 @@ export function uploadDataset(name, problemTypeCode, rawInput, sizeMetric) {
     });
 }
 
-export function createRace(datasetId) {
-    return request(`/races?datasetId=${datasetId}`, { method: 'POST' });
+export function createRace(datasetId, timeLimitSeconds) {
+    const query = timeLimitSeconds !== undefined && timeLimitSeconds !== null ? `&timeLimitSeconds=${timeLimitSeconds}` : '';
+    return request(`/races?datasetId=${datasetId}${query}`, { method: 'POST' });
 }
 
 export function startRace(raceId) {
     return request(`/races/${raceId}/start`, { method: 'POST' });
+}
+
+export function stopRace(raceId) {
+    return request(`/races/${raceId}/stop`, { method: 'POST' });
 }

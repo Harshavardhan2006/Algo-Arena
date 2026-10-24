@@ -1,5 +1,6 @@
 package com.algoarena.controller;
 
+import com.algoarena.execution.ExecutionService;
 import com.algoarena.execution.RunProgressEvent;
 import com.algoarena.model.Race;
 import com.algoarena.model.Run;
@@ -8,6 +9,7 @@ import com.algoarena.repository.RaceRepository;
 import com.algoarena.repository.RunEventRepository;
 import com.algoarena.repository.RunRepository;
 import com.algoarena.service.RaceService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +33,7 @@ public class RaceController {
             String problemType,
             String datasetName,
             Integer datasetSize,
+            Integer timeLimitSeconds,
             List<RunStateResponse> runs) {}
 
     public record RunStateResponse(
@@ -46,22 +49,37 @@ public class RaceController {
             Double progress,
             Object stats) {}
 
+    @Value("${algoarena.execution.max-runtime-seconds}")
+    private int defaultMaxRuntimeSeconds;
+
+    @Value("${algoarena.execution.max-time-limit-seconds:600}")
+    private int maxTimeLimitSeconds;
+
     private final RaceService raceService;
     private final RaceRepository raceRepository;
     private final RunRepository runRepository;
     private final RunEventRepository runEventRepository;
+    private final ExecutionService executionService;
 
     public RaceController(RaceService raceService, RaceRepository raceRepository,
-                          RunRepository runRepository, RunEventRepository runEventRepository) {
+                          RunRepository runRepository, RunEventRepository runEventRepository,
+                          ExecutionService executionService) {
         this.raceService = raceService;
         this.raceRepository = raceRepository;
         this.runRepository = runRepository;
         this.runEventRepository = runEventRepository;
+        this.executionService = executionService;
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestParam Long datasetId, Authentication auth) {
-        return raceService.create(datasetId, auth.getName())
+    public ResponseEntity<?> create(@RequestParam Long datasetId,
+                                    @RequestParam(required = false) Integer timeLimitSeconds,
+                                    Authentication auth) {
+        int limit = timeLimitSeconds != null ? timeLimitSeconds : defaultMaxRuntimeSeconds;
+        if (limit < 5 || limit > maxTimeLimitSeconds) {
+            return ResponseEntity.badRequest().body("timeLimitSeconds must be between 5 and " + maxTimeLimitSeconds);
+        }
+        return raceService.create(datasetId, auth.getName(), limit)
                 .<ResponseEntity<?>>map(race -> ResponseEntity.ok(Map.of(
                         "raceId", race.getId(),
                         "status", race.getStatus(),
@@ -71,16 +89,35 @@ public class RaceController {
     }
 
     @PostMapping("/{id}/start")
-    public ResponseEntity<?> start(@PathVariable Long id) {
+    public ResponseEntity<?> start(@PathVariable Long id, Authentication auth) {
         Race race = raceRepository.findById(id).orElse(null);
         if (race == null) {
             return ResponseEntity.notFound().build();
+        }
+        if (race.getInitiatedBy() == null || auth == null || !race.getInitiatedBy().getUsername().equals(auth.getName())) {
+            return ResponseEntity.status(403).body("forbidden");
         }
         if (!"pending".equals(race.getStatus())) {
             return ResponseEntity.status(409).body("race already started");
         }
         raceService.start(race);
         return ResponseEntity.ok(Map.of("raceId", id, "status", "running"));
+    }
+
+    @PostMapping("/{id}/stop")
+    public ResponseEntity<?> stop(@PathVariable Long id, Authentication auth) {
+        Race race = raceRepository.findById(id).orElse(null);
+        if (race == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (race.getInitiatedBy() == null || auth == null || !race.getInitiatedBy().getUsername().equals(auth.getName())) {
+            return ResponseEntity.status(403).body("forbidden");
+        }
+        if (!"running".equals(race.getStatus())) {
+            return ResponseEntity.status(409).body("race is not running");
+        }
+        executionService.cancelRace(id);
+        return ResponseEntity.ok(Map.of("raceId", id, "status", "cancelling"));
     }
 
     @GetMapping("/{id}")
@@ -111,16 +148,9 @@ public class RaceController {
         }
 
         List<Run> runs = runRepository.findByRaceId(id);
-        List<Long> runIds = runs.stream().map(Run::getId).toList();
-        List<RunEvent> events = runIds.isEmpty() ? List.of() : runEventRepository.findByRunIdInOrderByIdAsc(runIds);
-
-        Map<Long, RunEvent> lastEventByRunId = new HashMap<>();
-        for (RunEvent event : events) {
-            lastEventByRunId.put(event.getRunId(), event);
-        }
 
         List<RunStateResponse> runResponses = runs.stream().map(run -> {
-            RunEvent lastEvent = lastEventByRunId.get(run.getId());
+            RunEvent lastEvent = runEventRepository.findFirstByRunIdOrderByIdDesc(run.getId());
             Double score = run.getFinalScore() != null ? run.getFinalScore()
                     : (lastEvent != null ? lastEvent.getCurrentScore() : null);
             Integer iterations = run.getIterations() != null ? run.getIterations()
@@ -160,6 +190,7 @@ public class RaceController {
                 race.getDataset().getProblemType().getCode(),
                 race.getDataset().getName(),
                 race.getDataset().getSizeMetric(),
+                race.getTimeLimitSeconds(),
                 runResponses
         );
 

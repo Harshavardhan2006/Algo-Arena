@@ -22,7 +22,9 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -34,6 +36,9 @@ public class ExecutionService {
     private final RunEventRepository runEventRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
+
+    private final ConcurrentHashMap<Long, String> runningContainers = new ConcurrentHashMap<>();
+    private final Set<Long> cancelledRaces = ConcurrentHashMap.newKeySet();
 
     @Value("${algoarena.execution.max-runtime-seconds}")
     private long maxRuntimeSeconds;
@@ -57,11 +62,38 @@ public class ExecutionService {
         this.objectMapper = objectMapper;
     }
 
+    public void cancelRace(Long raceId) {
+        cancelledRaces.add(raceId);
+        for (Run run : runRepository.findByRaceId(raceId)) {
+            String container = runningContainers.get(run.getId());
+            if (container != null) {
+                killContainer(container);
+            }
+        }
+    }
+
     @Async("raceExecutor")
     public void executeRun(Long runId) {
         Run run = runRepository.findById(runId).orElseThrow();
         Long raceId = run.getRace().getId();
         String code = run.getAlgorithm().getCode();
+
+        if (cancelledRaces.contains(raceId)) {
+            run.setStatus("cancelled");
+            run.setCompletedAt(Instant.now());
+            runRepository.save(run);
+            RunEvent event = new RunEvent();
+            event.setRunId(runId);
+            event.setEventTime(Instant.now());
+            event.setIteration(0);
+            event.setCurrentScore(null);
+            event.setElapsedMs(0L);
+            event.setEventType("cancelled");
+            event = runEventRepository.save(event);
+            send(raceId, new RunProgressEvent(event.getId(), runId, code, "cancelled", 0, null, 0L, null, null, null));
+            closeRaceIfDone(raceId);
+            return;
+        }
 
         run.setStatus("running");
         run.setStartedAt(Instant.now());
@@ -116,11 +148,13 @@ public class ExecutionService {
                     dockerImage,
                     "node", "/app/workers/" + run.getAlgorithm().getWorkerEntrypoint(), "/input.json");
             builder.redirectErrorStream(true);
+            runningContainers.put(runId, containerName);
             Process process = builder.start();
 
+            long timeLimit = run.getRace().getTimeLimitSeconds();
             Thread watchdog = new Thread(() -> {
                 try {
-                    if (!process.waitFor(maxRuntimeSeconds, TimeUnit.SECONDS)) {
+                    if (!process.waitFor(timeLimit, TimeUnit.SECONDS)) {
                         timedOut.set(true);
                         killContainer(containerName);
                         process.destroyForcibly();
@@ -246,6 +280,22 @@ public class ExecutionService {
                 event = runEventRepository.save(event);
                 send(raceId, new RunProgressEvent(event.getId(), runId, code, "timed_out", lastIteration, lastScore,
                         elapsed, null, null, null));
+            } else if (cancelledRaces.contains(raceId) && !sawFinal) {
+                run.setStatus("cancelled");
+                run.setFinalScore(lastScore);
+                run.setIterations(lastIteration);
+                run.setRuntimeMs(System.currentTimeMillis() - begin);
+                long elapsed = System.currentTimeMillis() - begin;
+                RunEvent event = new RunEvent();
+                event.setRunId(runId);
+                event.setEventTime(Instant.now());
+                event.setIteration(lastIteration);
+                event.setCurrentScore(lastScore);
+                event.setElapsedMs(elapsed);
+                event.setEventType("cancelled");
+                event = runEventRepository.save(event);
+                send(raceId, new RunProgressEvent(event.getId(), runId, code, "cancelled", lastIteration, lastScore,
+                        elapsed, null, null, null));
             } else if (exitCode != 0 || !sawFinal) {
                 run.setStatus("failed");
                 long elapsed = System.currentTimeMillis() - begin;
@@ -268,19 +318,37 @@ public class ExecutionService {
             }
         } catch (Exception e) {
             failure = e.getMessage();
-            run.setStatus("failed");
             long elapsed = System.currentTimeMillis() - begin;
-            RunEvent event = new RunEvent();
-            event.setRunId(runId);
-            event.setEventTime(Instant.now());
-            event.setIteration(lastIteration);
-            event.setCurrentScore(lastScore);
-            event.setElapsedMs(elapsed);
-            event.setEventType("failed");
-            event = runEventRepository.save(event);
-            send(raceId, new RunProgressEvent(event.getId(), runId, code, "failed", lastIteration, lastScore,
-                    elapsed, null, null, null));
+            if (cancelledRaces.contains(raceId) && !sawFinal) {
+                run.setStatus("cancelled");
+                run.setFinalScore(lastScore);
+                run.setIterations(lastIteration);
+                run.setRuntimeMs(elapsed);
+                RunEvent event = new RunEvent();
+                event.setRunId(runId);
+                event.setEventTime(Instant.now());
+                event.setIteration(lastIteration);
+                event.setCurrentScore(lastScore);
+                event.setElapsedMs(elapsed);
+                event.setEventType("cancelled");
+                event = runEventRepository.save(event);
+                send(raceId, new RunProgressEvent(event.getId(), runId, code, "cancelled", lastIteration, lastScore,
+                        elapsed, null, null, null));
+            } else {
+                run.setStatus("failed");
+                RunEvent event = new RunEvent();
+                event.setRunId(runId);
+                event.setEventTime(Instant.now());
+                event.setIteration(lastIteration);
+                event.setCurrentScore(lastScore);
+                event.setElapsedMs(elapsed);
+                event.setEventType("failed");
+                event = runEventRepository.save(event);
+                send(raceId, new RunProgressEvent(event.getId(), runId, code, "failed", lastIteration, lastScore,
+                        elapsed, null, null, null));
+            }
         } finally {
+            runningContainers.remove(runId);
             run.setCompletedAt(Instant.now());
             runRepository.save(run);
             if (inputFile != null) {
@@ -290,17 +358,27 @@ public class ExecutionService {
         }
     }
 
-    private void closeRaceIfDone(Long raceId) {
+    private synchronized void closeRaceIfDone(Long raceId) {
         long open = runRepository.countByRaceIdAndStatusIn(raceId, List.of("queued", "running"));
         if (open > 0) {
             return;
         }
-        raceRepository.findById(raceId).ifPresent(race -> {
-            race.setStatus("completed");
-            race.setCompletedAt(Instant.now());
-            raceRepository.save(race);
-        });
-        send(raceId, new RunProgressEvent(null, null, null, "race_completed", null, null, null, null, null, null));
+        if (cancelledRaces.contains(raceId)) {
+            raceRepository.findById(raceId).ifPresent(race -> {
+                race.setStatus("cancelled");
+                race.setCompletedAt(Instant.now());
+                raceRepository.save(race);
+            });
+            send(raceId, new RunProgressEvent(null, null, null, "race_cancelled", null, null, null, null, null, null));
+            cancelledRaces.remove(raceId);
+        } else {
+            raceRepository.findById(raceId).ifPresent(race -> {
+                race.setStatus("completed");
+                race.setCompletedAt(Instant.now());
+                raceRepository.save(race);
+            });
+            send(raceId, new RunProgressEvent(null, null, null, "race_completed", null, null, null, null, null, null));
+        }
     }
 
     private void killContainer(String name) {

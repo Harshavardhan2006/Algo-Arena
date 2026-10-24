@@ -37,7 +37,7 @@ public class RaceService {
         this.executionService = executionService;
     }
 
-    public Optional<Race> create(Long datasetId, String username) {
+    public Optional<Race> create(Long datasetId, String username, int timeLimitSeconds) {
         Optional<Dataset> found = datasetRepository.findById(datasetId);
         if (found.isEmpty()) {
             return Optional.empty();
@@ -47,6 +47,7 @@ public class RaceService {
         Race race = new Race();
         race.setDataset(dataset);
         race.setInitiatedBy(userRepository.findByUsername(username).orElse(null));
+        race.setTimeLimitSeconds(timeLimitSeconds);
         race = raceRepository.save(race);
 
         List<Algorithm> algorithms = algorithmRepository.findByProblemTypeId(dataset.getProblemType().getId());
@@ -57,6 +58,10 @@ public class RaceService {
             runRepository.save(run);
         }
         return Optional.of(race);
+    }
+
+    public Optional<Race> create(Long datasetId, String username) {
+        return create(datasetId, username, 30);
     }
 
     public void start(Race race) {

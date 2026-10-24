@@ -9,4 +9,5 @@ import java.util.List;
 public interface RunEventRepository extends JpaRepository<RunEvent, Long> {
     List<RunEvent> findByRunIdInOrderByIdAsc(Collection<Long> runIds);
     List<RunEvent> findByRunIdInAndIdGreaterThanOrderByIdAsc(Collection<Long> runIds, Long afterId);
+    RunEvent findFirstByRunIdOrderByIdDesc(Long runId);
 }

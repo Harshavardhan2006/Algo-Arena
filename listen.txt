@@ -1,9 +1,0 @@
-listening on race 23
-{"eventId":14,"runId":45,"algorithmCode":"branch_and_bound","type":"started","iteration":0,"score":null,"elapsedMs":0,"computeMs":null,"progress":null,"stats":null}
-{"eventId":15,"runId":46,"algorithmCode":"greedy","type":"started","iteration":0,"score":null,"elapsedMs":0,"computeMs":null,"progress":null,"stats":null}
-{"eventId":16,"runId":45,"algorithmCode":"branch_and_bound","type":"progress","iteration":0,"score":3.01378695E8,"elapsedMs":377,"computeMs":null,"progress":null,"stats":{"nodes":0,"lowerBound":3.007918046666667E8}}
-{"eventId":17,"runId":46,"algorithmCode":"greedy","type":"progress","iteration":1,"score":null,"elapsedMs":385,"computeMs":null,"progress":0.045454545454545456,"stats":{"jobsPlaced":1,"totalJobs":22}}
-{"eventId":18,"runId":46,"algorithmCode":"greedy","type":"final","iteration":22,"score":3.39069991E8,"elapsedMs":391,"computeMs":0.810462,"progress":1.0,"stats":{"jobsPlaced":22,"totalJobs":22}}
-{"eventId":19,"runId":45,"algorithmCode":"branch_and_bound","type":"progress","iteration":2680000,"score":3.0079278E8,"elapsedMs":620,"computeMs":null,"progress":null,"stats":{"nodes":2680000,"lowerBound":3.007918046666667E8}}
-{"eventId":20,"runId":45,"algorithmCode":"branch_and_bound","type":"final","iteration":3807791,"score":3.0079278E8,"elapsedMs":698,"computeMs":320.419593,"progress":null,"stats":{"nodes":3807791,"lowerBound":3.007918046666667E8}}
-{"eventId":null,"runId":null,"algorithmCode":null,"type":"race_completed","iteration":null,"score":null,"elapsedMs":null,"computeMs":null,"progress":null,"stats":null}

@@ -41,7 +41,8 @@ CREATE TABLE races (
     initiated_by BIGINT REFERENCES users(id),
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     started_at TIMESTAMP,
-    completed_at TIMESTAMP
+    completed_at TIMESTAMP,
+    time_limit_seconds INT NOT NULL DEFAULT 30
 );
 
 CREATE TABLE runs (
