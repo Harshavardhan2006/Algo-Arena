@@ -21,6 +21,7 @@ export default function DatasetForm({ onRaceCreated }) {
     const [jobsText, setJobsText] = useState(JSON.stringify(SAMPLE, null, 2));
     const [randomCount, setRandomCount] = useState(20);
     const [difficulty, setDifficulty] = useState('easy');
+    const [timeLimitSeconds, setTimeLimitSeconds] = useState(30);
     const [error, setError] = useState(null);
     const [busy, setBusy] = useState(false);
 
@@ -41,7 +42,7 @@ export default function DatasetForm({ onRaceCreated }) {
                 { jobs, machineCount: Number(machineCount) },
                 jobs.length
             );
-            const race = await createRace(dataset.id);
+            const race = await createRace(dataset.id, Number(timeLimitSeconds));
             onRaceCreated(race.raceId);
         } catch (e) {
             setError(e.message);
@@ -60,6 +61,16 @@ export default function DatasetForm({ onRaceCreated }) {
             <label>
                 Machines
                 <input type="number" min="1" value={machineCount} onChange={(e) => setMachineCount(e.target.value)} />
+            </label>
+            <label>
+                Time limit (seconds)
+                <input
+                    type="number"
+                    min="5"
+                    max="600"
+                    value={timeLimitSeconds}
+                    onChange={(e) => setTimeLimitSeconds(e.target.value)}
+                />
             </label>
             <label>
                 Jobs (JSON array of id and duration)

@@ -73,3 +73,11 @@ export function startRace(raceId) {
 export function stopRace(raceId) {
     return request(`/races/${raceId}/stop`, { method: 'POST' });
 }
+
+export function getRaceState(raceId) {
+    return request(`/races/${raceId}/state`);
+}
+
+export function getRaceEvents(raceId, after = 0) {
+    return request(`/races/${raceId}/events?after=${after}`);
+}
