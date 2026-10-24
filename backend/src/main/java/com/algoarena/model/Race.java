@@ -33,6 +33,12 @@ public class Race {
     @Column(name = "time_limit_seconds", nullable = false)
     private int timeLimitSeconds = 30;
 
+    @Column(name = "paused_at")
+    private Instant pausedAt;
+
+    @Column(name = "paused_total_ms", nullable = false)
+    private long pausedTotalMs = 0;
+
     @OneToMany(mappedBy = "race", cascade = CascadeType.ALL)
     private List<Run> runs = new ArrayList<>();
 
@@ -49,5 +55,9 @@ public class Race {
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
     public int getTimeLimitSeconds() { return timeLimitSeconds; }
     public void setTimeLimitSeconds(int timeLimitSeconds) { this.timeLimitSeconds = timeLimitSeconds; }
+    public Instant getPausedAt() { return pausedAt; }
+    public void setPausedAt(Instant pausedAt) { this.pausedAt = pausedAt; }
+    public long getPausedTotalMs() { return pausedTotalMs; }
+    public void setPausedTotalMs(long pausedTotalMs) { this.pausedTotalMs = pausedTotalMs; }
     public List<Run> getRuns() { return runs; }
 }

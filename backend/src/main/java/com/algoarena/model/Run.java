@@ -44,6 +44,9 @@ public class Run {
 
     private Long iterations;
 
+    @Column(name = "paused_ms", nullable = false)
+    private long pausedMs = 0;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "result_output")
     private Map<String, Object> resultOutput;
@@ -67,6 +70,8 @@ public class Run {
     public void setPeakMemoryKb(Long peakMemoryKb) { this.peakMemoryKb = peakMemoryKb; }
     public Long getIterations() { return iterations; }
     public void setIterations(Long iterations) { this.iterations = iterations; }
+    public long getPausedMs() { return pausedMs; }
+    public void setPausedMs(long pausedMs) { this.pausedMs = pausedMs; }
     public Map<String, Object> getResultOutput() { return resultOutput; }
     public void setResultOutput(Map<String, Object> resultOutput) { this.resultOutput = resultOutput; }
 }

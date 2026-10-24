@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -34,6 +35,8 @@ public class RaceController {
             String datasetName,
             Integer datasetSize,
             Integer timeLimitSeconds,
+            Instant pausedAt,
+            Long pausedTotalMs,
             List<RunStateResponse> runs) {}
 
     public record RunStateResponse(
@@ -47,7 +50,8 @@ public class RaceController {
             Long elapsedMs,
             Long computeMs,
             Double progress,
-            Object stats) {}
+            Object stats,
+            Long pausedMs) {}
 
     @Value("${algoarena.execution.max-runtime-seconds}")
     private int defaultMaxRuntimeSeconds;
@@ -104,8 +108,8 @@ public class RaceController {
         return ResponseEntity.ok(Map.of("raceId", id, "status", "running"));
     }
 
-    @PostMapping("/{id}/stop")
-    public ResponseEntity<?> stop(@PathVariable Long id, Authentication auth) {
+    @PostMapping("/{id}/pause")
+    public ResponseEntity<?> pause(@PathVariable Long id, Authentication auth) {
         Race race = raceRepository.findById(id).orElse(null);
         if (race == null) {
             return ResponseEntity.notFound().build();
@@ -115,6 +119,59 @@ public class RaceController {
         }
         if (!"running".equals(race.getStatus())) {
             return ResponseEntity.status(409).body("race is not running");
+        }
+        race.setStatus("paused");
+        race.setPausedAt(Instant.now());
+        raceRepository.save(race);
+        executionService.pauseRace(id);
+        executionService.broadcast(id, "race_paused");
+        return ResponseEntity.ok(Map.of("raceId", id, "status", "paused"));
+    }
+
+    @PostMapping("/{id}/resume")
+    public ResponseEntity<?> resume(@PathVariable Long id, Authentication auth) {
+        Race race = raceRepository.findById(id).orElse(null);
+        if (race == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (race.getInitiatedBy() == null || auth == null || !race.getInitiatedBy().getUsername().equals(auth.getName())) {
+            return ResponseEntity.status(403).body("forbidden");
+        }
+        if (!"paused".equals(race.getStatus())) {
+            return ResponseEntity.status(409).body("race is not paused");
+        }
+        executionService.resumeRace(id);
+        race.setStatus("running");
+        if (race.getPausedAt() != null) {
+            long pausedDuration = Duration.between(race.getPausedAt(), Instant.now()).toMillis();
+            race.setPausedTotalMs(race.getPausedTotalMs() + pausedDuration);
+            race.setPausedAt(null);
+        }
+        raceRepository.save(race);
+        executionService.broadcast(id, "race_resumed");
+        return ResponseEntity.ok(Map.of("raceId", id, "status", "running"));
+    }
+
+    @PostMapping("/{id}/stop")
+    public ResponseEntity<?> stop(@PathVariable Long id, Authentication auth) {
+        Race race = raceRepository.findById(id).orElse(null);
+        if (race == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (race.getInitiatedBy() == null || auth == null || !race.getInitiatedBy().getUsername().equals(auth.getName())) {
+            return ResponseEntity.status(403).body("forbidden");
+        }
+        if (!"running".equals(race.getStatus()) && !"paused".equals(race.getStatus())) {
+            return ResponseEntity.status(409).body("race is not running");
+        }
+        if ("paused".equals(race.getStatus())) {
+            executionService.clearPause(id);
+            if (race.getPausedAt() != null) {
+                long pausedDuration = Duration.between(race.getPausedAt(), Instant.now()).toMillis();
+                race.setPausedTotalMs(race.getPausedTotalMs() + pausedDuration);
+                race.setPausedAt(null);
+            }
+            raceRepository.save(race);
         }
         executionService.cancelRace(id);
         return ResponseEntity.ok(Map.of("raceId", id, "status", "cancelling"));
@@ -178,7 +235,8 @@ public class RaceController {
                     elapsedMs,
                     computeMs,
                     progress,
-                    stats
+                    stats,
+                    run.getPausedMs()
             );
         }).toList();
 
@@ -191,6 +249,8 @@ public class RaceController {
                 race.getDataset().getName(),
                 race.getDataset().getSizeMetric(),
                 race.getTimeLimitSeconds(),
+                race.getPausedAt(),
+                race.getPausedTotalMs(),
                 runResponses
         );
 

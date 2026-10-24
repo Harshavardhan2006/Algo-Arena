@@ -19,6 +19,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,11 +27,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class ExecutionService {
+
+    private static class RunPauseState {
+        volatile long pausedSince = 0L;
+        final AtomicLong totalPausedMs = new AtomicLong(0L);
+    }
 
     private final RunRepository runRepository;
     private final RaceRepository raceRepository;
@@ -40,6 +48,8 @@ public class ExecutionService {
 
     private final ConcurrentHashMap<Long, String> runningContainers = new ConcurrentHashMap<>();
     private final Set<Long> cancelledRaces = ConcurrentHashMap.newKeySet();
+    private final Set<Long> pausedRaces = ConcurrentHashMap.newKeySet();
+    private final ConcurrentMap<Long, RunPauseState> pauseStates = new ConcurrentHashMap<>();
 
     @Value("${algoarena.execution.max-runtime-seconds}")
     private long maxRuntimeSeconds;
@@ -63,8 +73,77 @@ public class ExecutionService {
         this.objectMapper = objectMapper;
     }
 
+    private boolean runDockerCommand(String... args) {
+        try {
+            Process process = new ProcessBuilder(args)
+                    .redirectErrorStream(true)
+                    .start();
+            return process.waitFor(10, TimeUnit.SECONDS) && process.exitValue() == 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void killContainer(String name) {
+        runDockerCommand("docker", "rm", "-f", name);
+    }
+
+    private long activeElapsedMs(Long runId, long beginMillis) {
+        long now = System.currentTimeMillis();
+        RunPauseState state = pauseStates.get(runId);
+        if (state == null) {
+            return now - beginMillis;
+        }
+        long since = state.pausedSince;
+        long total = state.totalPausedMs.get();
+        long current = since > 0 ? now - since : 0;
+        return now - beginMillis - total - current;
+    }
+
+    public void pauseRace(Long raceId) {
+        pausedRaces.add(raceId);
+        for (Run run : runRepository.findByRaceId(raceId)) {
+            Long runId = run.getId();
+            String container = runningContainers.get(runId);
+            if (container != null) {
+                if (runDockerCommand("docker", "pause", container)) {
+                    RunPauseState state = pauseStates.get(runId);
+                    if (state != null && state.pausedSince == 0L) {
+                        state.pausedSince = System.currentTimeMillis();
+                    }
+                }
+            }
+        }
+    }
+
+    public void resumeRace(Long raceId) {
+        pausedRaces.remove(raceId);
+        for (Run run : runRepository.findByRaceId(raceId)) {
+            Long runId = run.getId();
+            String container = runningContainers.get(runId);
+            RunPauseState state = pauseStates.get(runId);
+            if (container != null && state != null && state.pausedSince > 0L) {
+                long since = state.pausedSince;
+                if (runDockerCommand("docker", "unpause", container)) {
+                    long now = System.currentTimeMillis();
+                    state.totalPausedMs.addAndGet(now - since);
+                    state.pausedSince = 0L;
+                }
+            }
+        }
+    }
+
+    public void broadcast(Long raceId, String type) {
+        send(raceId, new RunProgressEvent(null, null, null, type, null, null, null, null, null, null));
+    }
+
+    public void clearPause(Long raceId) {
+        pausedRaces.remove(raceId);
+    }
+
     public void cancelRace(Long raceId) {
         cancelledRaces.add(raceId);
+        pausedRaces.remove(raceId);
         for (Run run : runRepository.findByRaceId(raceId)) {
             String container = runningContainers.get(run.getId());
             if (container != null) {
@@ -78,6 +157,15 @@ public class ExecutionService {
         Run run = runRepository.findById(runId).orElseThrow();
         Long raceId = run.getRace().getId();
         String code = run.getAlgorithm().getCode();
+
+        while (pausedRaces.contains(raceId) && !cancelledRaces.contains(raceId)) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
 
         if (cancelledRaces.contains(raceId)) {
             run.setStatus("cancelled");
@@ -150,6 +238,7 @@ public class ExecutionService {
                     "node", "/app/workers/" + run.getAlgorithm().getWorkerEntrypoint(), "/input.json");
             builder.redirectErrorStream(true);
             runningContainers.put(runId, containerName);
+            pauseStates.put(runId, new RunPauseState());
             if (cancelledRaces.contains(raceId)) {
                 run.setStatus("cancelled");
                 run.setCompletedAt(Instant.now());
@@ -165,6 +254,7 @@ public class ExecutionService {
                 send(raceId, new RunProgressEvent(event.getId(), runId, code, "cancelled", 0L, null, 0L, null, null, null));
                 closeRaceIfDone(raceId);
                 runningContainers.remove(runId);
+                pauseStates.remove(runId);
                 return;
             }
             Process process = builder.start();
@@ -173,6 +263,8 @@ public class ExecutionService {
             Thread watchdog = new Thread(() -> {
                 long watchdogStart = System.currentTimeMillis();
                 long lastKillAttempt = 0L;
+                long lastPauseAttempt = 0L;
+                RunPauseState pauseState = pauseStates.get(runId);
                 try {
                     while (process.isAlive()) {
                         if (cancelledRaces.contains(raceId)) {
@@ -181,11 +273,40 @@ public class ExecutionService {
                                 killContainer(containerName);
                                 lastKillAttempt = now;
                             }
-                        } else if (System.currentTimeMillis() - watchdogStart > timeLimit * 1000L) {
-                            timedOut.set(true);
-                            killContainer(containerName);
-                            process.destroyForcibly();
-                            break;
+                        } else {
+                            if (pausedRaces.contains(raceId)) {
+                                if (pauseState != null && pauseState.pausedSince == 0L) {
+                                    long now = System.currentTimeMillis();
+                                    if (now - lastPauseAttempt >= 300) {
+                                        lastPauseAttempt = now;
+                                        if (runDockerCommand("docker", "pause", containerName)) {
+                                            pauseState.pausedSince = System.currentTimeMillis();
+                                        }
+                                    }
+                                }
+                            } else {
+                                if (pauseState != null && pauseState.pausedSince > 0L) {
+                                    long since = pauseState.pausedSince;
+                                    if (runDockerCommand("docker", "unpause", containerName)) {
+                                        long now = System.currentTimeMillis();
+                                        pauseState.totalPausedMs.addAndGet(now - since);
+                                        pauseState.pausedSince = 0L;
+                                    }
+                                }
+                            }
+
+                            long now = System.currentTimeMillis();
+                            long totalPaused = pauseState != null ? pauseState.totalPausedMs.get() : 0L;
+                            long currentPause = (pauseState != null && pauseState.pausedSince > 0L)
+                                    ? now - pauseState.pausedSince : 0L;
+                            long activeTime = now - watchdogStart - totalPaused - currentPause;
+
+                            if (activeTime > timeLimit * 1000L) {
+                                timedOut.set(true);
+                                killContainer(containerName);
+                                process.destroyForcibly();
+                                break;
+                            }
                         }
                         Thread.sleep(100);
                     }
@@ -238,7 +359,7 @@ public class ExecutionService {
                         }
                     }
 
-                    long elapsed = System.currentTimeMillis() - begin;
+                    long elapsed = activeElapsedMs(runId, begin);
 
                     boolean keep = false;
                     if ("final".equals(type)) {
@@ -298,8 +419,8 @@ public class ExecutionService {
                 run.setStatus("timed_out");
                 run.setFinalScore(lastScore);
                 run.setIterations(lastIteration);
-                run.setRuntimeMs(System.currentTimeMillis() - begin);
-                long elapsed = System.currentTimeMillis() - begin;
+                long elapsed = activeElapsedMs(runId, begin);
+                run.setRuntimeMs(elapsed);
                 RunEvent event = new RunEvent();
                 event.setRunId(runId);
                 event.setEventTime(Instant.now());
@@ -314,8 +435,8 @@ public class ExecutionService {
                 run.setStatus("cancelled");
                 run.setFinalScore(lastScore);
                 run.setIterations(lastIteration);
-                run.setRuntimeMs(System.currentTimeMillis() - begin);
-                long elapsed = System.currentTimeMillis() - begin;
+                long elapsed = activeElapsedMs(runId, begin);
+                run.setRuntimeMs(elapsed);
                 RunEvent event = new RunEvent();
                 event.setRunId(runId);
                 event.setEventTime(Instant.now());
@@ -328,7 +449,8 @@ public class ExecutionService {
                         elapsed, null, null, null));
             } else if (exitCode != 0 || !sawFinal) {
                 run.setStatus("failed");
-                long elapsed = System.currentTimeMillis() - begin;
+                long elapsed = activeElapsedMs(runId, begin);
+                run.setRuntimeMs(elapsed);
                 RunEvent event = new RunEvent();
                 event.setRunId(runId);
                 event.setEventTime(Instant.now());
@@ -343,12 +465,15 @@ public class ExecutionService {
                 run.setStatus("completed");
                 run.setFinalScore(finalScore);
                 run.setIterations(finalIteration);
-                run.setRuntimeMs(computeMs != null ? Math.round(computeMs) : System.currentTimeMillis() - begin);
+                RunPauseState pauseState = pauseStates.get(runId);
+                long totalPaused = pauseState != null ? pauseState.totalPausedMs.get() : 0L;
+                long comp = computeMs != null ? Math.round(computeMs) : activeElapsedMs(runId, begin);
+                run.setRuntimeMs(Math.max(0L, comp - totalPaused));
                 run.setResultOutput(finalPayload);
             }
         } catch (Exception e) {
             failure = e.getMessage();
-            long elapsed = System.currentTimeMillis() - begin;
+            long elapsed = activeElapsedMs(runId, begin);
             if (cancelledRaces.contains(raceId) && !sawFinal) {
                 run.setStatus("cancelled");
                 run.setFinalScore(lastScore);
@@ -366,6 +491,7 @@ public class ExecutionService {
                         elapsed, null, null, null));
             } else {
                 run.setStatus("failed");
+                run.setRuntimeMs(elapsed);
                 RunEvent event = new RunEvent();
                 event.setRunId(runId);
                 event.setEventTime(Instant.now());
@@ -378,6 +504,13 @@ public class ExecutionService {
                         elapsed, null, null, null));
             }
         } finally {
+            RunPauseState state = pauseStates.get(runId);
+            if (state != null) {
+                long total = state.totalPausedMs.get();
+                long current = state.pausedSince > 0L ? System.currentTimeMillis() - state.pausedSince : 0L;
+                run.setPausedMs(total + current);
+            }
+            pauseStates.remove(runId);
             runningContainers.remove(runId);
             run.setCompletedAt(Instant.now());
             runRepository.save(run);
@@ -397,6 +530,12 @@ public class ExecutionService {
         if (race == null || "completed".equals(race.getStatus()) || "cancelled".equals(race.getStatus())) {
             return;
         }
+        if (race.getPausedAt() != null) {
+            long pausedDuration = Duration.between(race.getPausedAt(), Instant.now()).toMillis();
+            race.setPausedTotalMs(race.getPausedTotalMs() + pausedDuration);
+            race.setPausedAt(null);
+        }
+        pausedRaces.remove(raceId);
         if (cancelledRaces.contains(raceId)) {
             race.setStatus("cancelled");
             race.setCompletedAt(Instant.now());
@@ -408,16 +547,6 @@ public class ExecutionService {
             race.setCompletedAt(Instant.now());
             raceRepository.save(race);
             send(raceId, new RunProgressEvent(null, null, null, "race_completed", null, null, null, null, null, null));
-        }
-    }
-
-    private void killContainer(String name) {
-        try {
-            new ProcessBuilder("docker", "rm", "-f", name)
-                    .redirectErrorStream(true)
-                    .start()
-                    .waitFor(10, TimeUnit.SECONDS);
-        } catch (Exception ignored) {
         }
     }
 

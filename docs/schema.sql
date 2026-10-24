@@ -42,7 +42,9 @@ CREATE TABLE races (
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
-    time_limit_seconds INT NOT NULL DEFAULT 30
+    time_limit_seconds INT NOT NULL DEFAULT 30,
+    paused_at TIMESTAMP,
+    paused_total_ms BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE runs (
@@ -56,6 +58,7 @@ CREATE TABLE runs (
     runtime_ms BIGINT,
     peak_memory_kb BIGINT,
     iterations BIGINT,
+    paused_ms BIGINT NOT NULL DEFAULT 0,
     result_output JSONB
 );
 
