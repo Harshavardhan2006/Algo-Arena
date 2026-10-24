@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +36,17 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class ExecutionService {
 
+    private static class PauseInterval {
+        final long start;
+        final long end;
+        PauseInterval(long start, long end) { this.start = start; this.end = end; }
+    }
+
     private static class RunPauseState {
         volatile long pausedSince = 0L;
         final AtomicLong totalPausedMs = new AtomicLong(0L);
+        final List<PauseInterval> closedIntervals = new ArrayList<>();
+        volatile long readyAt = 0L;
     }
 
     private final RunRepository runRepository;
@@ -127,6 +136,9 @@ public class ExecutionService {
                 if (runDockerCommand("docker", "unpause", container)) {
                     long now = System.currentTimeMillis();
                     state.totalPausedMs.addAndGet(now - since);
+                    synchronized (state.closedIntervals) {
+                        state.closedIntervals.add(new PauseInterval(since, now));
+                    }
                     state.pausedSince = 0L;
                 }
             }
@@ -207,6 +219,7 @@ public class ExecutionService {
         Long lastIteration = null;
         Double computeMs = null;
         Map<String, Object> finalPayload = null;
+        Long finalAt = null;
         AtomicBoolean timedOut = new AtomicBoolean(false);
         String failure = null;
 
@@ -290,6 +303,9 @@ public class ExecutionService {
                                     if (runDockerCommand("docker", "unpause", containerName)) {
                                         long now = System.currentTimeMillis();
                                         pauseState.totalPausedMs.addAndGet(now - since);
+                                        synchronized (pauseState.closedIntervals) {
+                                            pauseState.closedIntervals.add(new PauseInterval(since, now));
+                                        }
                                         pauseState.pausedSince = 0L;
                                     }
                                 }
@@ -332,6 +348,15 @@ public class ExecutionService {
                     }
 
                     String type = event.path("type").asText("progress");
+
+                    if ("ready".equals(type)) {
+                        RunPauseState rps = pauseStates.get(runId);
+                        if (rps != null) {
+                            rps.readyAt = System.currentTimeMillis();
+                        }
+                        continue;
+                    }
+
                     Long iteration = event.hasNonNull("iteration") ? event.get("iteration").asLong() : null;
                     Double score = event.hasNonNull("score") ? event.get("score").asDouble() : null;
                     Double compute = event.hasNonNull("computeMs") ? event.get("computeMs").asDouble() : null;
@@ -354,6 +379,7 @@ public class ExecutionService {
                         finalScore = score;
                         finalIteration = iteration;
                         computeMs = compute;
+                        finalAt = System.currentTimeMillis();
                         if (payload != null) {
                             finalPayload = objectMapper.convertValue(payload, new TypeReference<Map<String, Object>>() {});
                         }
@@ -465,10 +491,31 @@ public class ExecutionService {
                 run.setStatus("completed");
                 run.setFinalScore(finalScore);
                 run.setIterations(finalIteration);
-                RunPauseState pauseState = pauseStates.get(runId);
-                long totalPaused = pauseState != null ? pauseState.totalPausedMs.get() : 0L;
                 long comp = computeMs != null ? Math.round(computeMs) : activeElapsedMs(runId, begin);
-                run.setRuntimeMs(Math.max(0L, comp - totalPaused));
+                RunPauseState pauseState = pauseStates.get(runId);
+                long overlapMs;
+                if (pauseState == null || pauseState.readyAt == 0L) {
+                    overlapMs = pauseState != null ? pauseState.totalPausedMs.get() : 0L;
+                } else {
+                    long rAt = pauseState.readyAt;
+                    long fAt = finalAt != null ? finalAt : System.currentTimeMillis();
+                    overlapMs = 0L;
+                    List<PauseInterval> intervals;
+                    synchronized (pauseState.closedIntervals) {
+                        intervals = new ArrayList<>(pauseState.closedIntervals);
+                    }
+                    long openSince = pauseState.pausedSince;
+                    if (openSince > 0L) {
+                        intervals = new ArrayList<>(intervals);
+                        intervals.add(new PauseInterval(openSince, fAt));
+                    }
+                    for (PauseInterval iv : intervals) {
+                        long s = Math.max(iv.start, rAt);
+                        long e = Math.min(iv.end, fAt);
+                        if (e > s) overlapMs += e - s;
+                    }
+                }
+                run.setRuntimeMs(Math.max(0L, comp - overlapMs));
                 run.setResultOutput(finalPayload);
             }
         } catch (Exception e) {

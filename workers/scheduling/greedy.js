@@ -1,6 +1,7 @@
 const fs = require('fs');
 
 const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+console.log(JSON.stringify({ type: 'ready' }));
 const begin = process.hrtime.bigint();
 let emitNs = 0n;
 function emit(event) {
