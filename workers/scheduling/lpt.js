@@ -1,0 +1,46 @@
+const fs = require('fs');
+
+const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+console.log(JSON.stringify({ type: 'ready' }));
+const begin = process.hrtime.bigint();
+let emitNs = 0n;
+function emit(event) {
+    const before = process.hrtime.bigint();
+    console.log(JSON.stringify(event));
+    emitNs += process.hrtime.bigint() - before;
+}
+
+const machineCount = input.machineCount || 3;
+const jobs = [...input.jobs].sort((a, b) => b.duration - a.duration);
+
+const load = new Array(machineCount).fill(0);
+const assignment = [];
+
+jobs.forEach((job, index) => {
+    let target = 0;
+    for (let m = 1; m < machineCount; m++) {
+        if (load[m] < load[target]) target = m;
+    }
+    assignment.push({ jobId: job.id, machine: target, startTime: load[target] });
+    load[target] += job.duration;
+
+    emit({
+        type: 'progress',
+        iteration: index + 1,
+        score: Math.max(...load),
+        progress: (index + 1) / jobs.length,
+        stats: { jobsPlaced: index + 1, totalJobs: jobs.length, strategy: 'LPT' }
+    });
+});
+
+const computeMs = Number(process.hrtime.bigint() - begin - emitNs) / 1e6;
+
+console.log(JSON.stringify({
+    type: 'final',
+    iteration: jobs.length,
+    score: Math.max(...load),
+    computeMs,
+    progress: 1,
+    stats: { jobsPlaced: jobs.length, totalJobs: jobs.length, strategy: 'LPT' },
+    payload: { assignment, machineLoad: load }
+}));

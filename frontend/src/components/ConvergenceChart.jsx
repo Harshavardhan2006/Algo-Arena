@@ -11,13 +11,15 @@ import {
 } from 'recharts';
 import { formatScore, getAlgorithmColor } from '../utils.js';
 
-export default function ConvergenceChart({ events, lowestLowerBound }) {
+export default function ConvergenceChart({ events, lowestLowerBound, metricName = 'Score' }) {
     const scoredEvents = events.filter((e) => e.score != null);
 
     if (scoredEvents.length === 0) {
         return (
             <div className="chart-card card">
-                <h3>Convergence</h3>
+                <div className="chart-card-header">
+                    <h3>Race Progress ({metricName} vs Time)</h3>
+                </div>
                 <div className="chart-empty-state">
                     Waiting for the first scored event...
                 </div>
@@ -48,7 +50,9 @@ export default function ConvergenceChart({ events, lowestLowerBound }) {
 
     return (
         <div className="chart-card card">
-            <h3>Convergence</h3>
+            <div className="chart-card-header">
+                <h3>Race Progress ({metricName} vs Time)</h3>
+            </div>
             <div style={{ width: '100%', height: 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 10, right: 20, left: 20, bottom: 10 }}>

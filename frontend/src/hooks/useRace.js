@@ -127,7 +127,7 @@ export function useRace(raceId) {
         pollIntervalRef.current = setInterval(() => {
             if (!active) return;
             const currentRace = raceRef.current;
-            if (!currentRace || currentRace.status === 'pending' || currentRace.status === 'running') {
+            if (!currentRace || ['pending', 'running', 'paused'].includes(currentRace.status)) {
                 const lastId = eventsRef.current.length > 0 ? eventsRef.current[eventsRef.current.length - 1].eventId : 0;
                 refreshStateAndEvents(lastId).catch(() => {});
             }
@@ -145,5 +145,18 @@ export function useRace(raceId) {
         };
     }, [raceId]);
 
-    return { race, events, connected, error };
+    return {
+        race,
+        events,
+        connected,
+        error,
+        refresh: () => {
+            const lastId = eventsRef.current.length > 0 ? eventsRef.current[eventsRef.current.length - 1].eventId : 0;
+            return Promise.all([getRaceState(raceId), getRaceEvents(raceId, lastId)]).then(([stateData, newEvents]) => {
+                setRace(stateData);
+                setEvents((prev) => mergeEvents(prev, newEvents));
+                return stateData;
+            });
+        }
+    };
 }

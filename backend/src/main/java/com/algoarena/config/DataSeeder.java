@@ -37,6 +37,9 @@ public class DataSeeder implements CommandLineRunner {
 
         seedAlgorithm(scheduling, "greedy", "Greedy (Shortest Job First)", "greedy", "scheduling/greedy.js");
         seedAlgorithm(scheduling, "branch_and_bound", "Branch and Bound (Optimal)", "exact", "scheduling/branch_and_bound.js");
+        seedAlgorithm(scheduling, "genetic", "Genetic Algorithm", "metaheuristic", "scheduling/genetic.js");
+        seedAlgorithm(scheduling, "lpt", "Longest Processing Time (LPT)", "greedy", "scheduling/lpt.js");
+        seedAlgorithm(scheduling, "simulated_annealing", "Simulated Annealing", "metaheuristic", "scheduling/simulated_annealing.js");
     }
 
     private void seedAlgorithm(ProblemType problemType, String code, String name, String paradigm, String entrypoint) {

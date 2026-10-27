@@ -13,7 +13,10 @@ export default function Leaderboard({
 
     return (
         <div className="leaderboard card">
-            <h3>Leaderboard</h3>
+            <div className="leaderboard-header">
+                <h3>Live Leaderboard</h3>
+                <span className="leaderboard-sub-tag">Real-Time Standings</span>
+            </div>
             <div className="table-responsive">
                 <table>
                     <thead>

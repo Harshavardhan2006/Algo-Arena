@@ -92,6 +92,22 @@ public class RaceController {
                 .orElseGet(() -> ResponseEntity.badRequest().body("dataset not found: " + datasetId));
     }
 
+    @GetMapping
+    public List<Map<String, Object>> listRaces() {
+        return raceRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id")).stream().map(race -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("raceId", race.getId());
+            map.put("status", race.getStatus());
+            map.put("startedAt", race.getStartedAt());
+            map.put("completedAt", race.getCompletedAt());
+            map.put("problemType", race.getDataset() != null && race.getDataset().getProblemType() != null ? race.getDataset().getProblemType().getCode() : null);
+            map.put("datasetName", race.getDataset() != null ? race.getDataset().getName() : null);
+            map.put("datasetSize", race.getDataset() != null ? race.getDataset().getSizeMetric() : null);
+            map.put("timeLimitSeconds", race.getTimeLimitSeconds());
+            return map;
+        }).toList();
+    }
+
     @PostMapping("/{id}/start")
     public ResponseEntity<?> start(@PathVariable Long id, Authentication auth) {
         Race race = raceRepository.findById(id).orElse(null);

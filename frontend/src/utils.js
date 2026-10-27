@@ -2,8 +2,10 @@ export const ALGORITHM_COLORS = {
     greedy: '#f59e0b',
     branch_and_bound: '#3b82f6',
     dynamic_programming: '#a855f7',
-    genetic_algorithm: '#22c55e',
-    simulated_annealing: '#14b8a6'
+    genetic: '#10b981',
+    genetic_algorithm: '#10b981',
+    lpt: '#06b6d4',
+    simulated_annealing: '#ec4899'
 };
 
 export const FALLBACK_PALETTE = ['#ec4899', '#06b6d4', '#8b5cf6', '#eab308', '#f97316', '#10b981'];

@@ -74,6 +74,22 @@ export function stopRace(raceId) {
     return request(`/races/${raceId}/stop`, { method: 'POST' });
 }
 
+export function pauseRace(raceId) {
+    return request(`/races/${raceId}/pause`, { method: 'POST' });
+}
+
+export function resumeRace(raceId) {
+    return request(`/races/${raceId}/resume`, { method: 'POST' });
+}
+
+export function getDatasets() {
+    return request('/datasets');
+}
+
+export function getRaces() {
+    return request('/races');
+}
+
 export function getRaceState(raceId) {
     return request(`/races/${raceId}/state`);
 }
