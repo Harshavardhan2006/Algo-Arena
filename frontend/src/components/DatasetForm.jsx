@@ -52,46 +52,116 @@ export default function DatasetForm({ onRaceCreated }) {
     }
 
     return (
-        <form className="card" onSubmit={submit}>
-            <h2>New scheduling race</h2>
-            <label>
-                Dataset name
-                <input value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label>
-                Machines
-                <input type="number" min="1" value={machineCount} onChange={(e) => setMachineCount(e.target.value)} />
-            </label>
-            <label>
-                Time limit (seconds)
-                <input
-                    type="number"
-                    min="5"
-                    max="600"
-                    value={timeLimitSeconds}
-                    onChange={(e) => setTimeLimitSeconds(e.target.value)}
-                />
-            </label>
-            <label>
-                Jobs (JSON array of id and duration)
-                <textarea rows={10} value={jobsText} onChange={(e) => setJobsText(e.target.value)} />
-            </label>
-            <div className="row">
-                <input
-                    type="number"
-                    min="1"
-                    max="200"
-                    value={randomCount}
-                    onChange={(e) => setRandomCount(e.target.value)}
-                />
-                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
-                    <option value="easy">Easy (5 to 60)</option>
-                    <option value="hard">Hard (1,000,000 to 100,000,000)</option>
-                </select>
-                <button type="button" className="secondary" onClick={fillRandom}>Fill with random jobs</button>
+        <div className="create-race-wizard">
+            <div className="wizard-header">
+                <span className="wizard-step-label">Quick Dataset Setup</span>
+                <h1 className="wizard-title">New Scheduling Race</h1>
             </div>
-            {error && <p className="error">{error}</p>}
-            <button type="submit" disabled={busy}>{busy ? 'Preparing...' : 'Start race'}</button>
-        </form>
+
+            <form className="dataset-upload-container card" onSubmit={submit}>
+                <div className="dataset-config-form">
+                    <div className="form-fields-row">
+                        <div className="form-field-group flex-2">
+                            <label className="field-label">Dataset Name</label>
+                            <input
+                                className="form-text-input"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="My scheduling problem"
+                            />
+                        </div>
+                        <div className="form-field-group flex-1">
+                            <label className="field-label">Machine Count</label>
+                            <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                className="form-text-input"
+                                value={machineCount}
+                                onChange={(e) => setMachineCount(e.target.value)}
+                            />
+                        </div>
+                        <div className="form-field-group flex-1">
+                            <label className="field-label">Time Limit (s)</label>
+                            <input
+                                type="number"
+                                min="5"
+                                max="600"
+                                className="form-text-input"
+                                value={timeLimitSeconds}
+                                onChange={(e) => setTimeLimitSeconds(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-field-group">
+                        <label className="field-label">Jobs JSON Array</label>
+                        <textarea
+                            className="form-json-textarea"
+                            rows={8}
+                            value={jobsText}
+                            onChange={(e) => setJobsText(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="random-gen-row">
+                        <input
+                            type="number"
+                            min="1"
+                            max="200"
+                            className="form-text-input"
+                            style={{ width: 80 }}
+                            value={randomCount}
+                            onChange={(e) => setRandomCount(e.target.value)}
+                        />
+                        <select
+                            className="filter-select"
+                            value={difficulty}
+                            onChange={(e) => setDifficulty(e.target.value)}
+                        >
+                            <option value="easy">Easy (5 to 60)</option>
+                            <option value="hard">Hard (1M to 100M)</option>
+                        </select>
+                        <button type="button" className="btn-browse-files" onClick={fillRandom}>
+                            Fill with random jobs
+                        </button>
+                    </div>
+
+                    {error && (
+                        <div className="wizard-error-banner">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" x2="12" y1="8" y2="12" />
+                                <line x1="12" x2="12.01" y1="16" y2="16" />
+                            </svg>
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    <div className="wizard-actions-bar">
+                        <div className="algo-checklist">
+                            <span className="checklist-label">Algorithms in this race:</span>
+                            <span className="checklist-tag algo-bb">Branch & Bound</span>
+                            <span className="checklist-tag algo-genetic">Genetic Algorithm</span>
+                            <span className="checklist-tag algo-greedy">Greedy (SJF)</span>
+                            <span className="checklist-tag algo-lpt">LPT Heuristic</span>
+                            <span className="checklist-tag algo-sa">Simulated Annealing</span>
+                        </div>
+                        <button type="submit" className="btn-wizard-launch" disabled={busy}>
+                            {busy ? (
+                                <span>Preparing Race...</span>
+                            ) : (
+                                <>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+                                    </svg>
+                                    <span>Start Race</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
     );
 }

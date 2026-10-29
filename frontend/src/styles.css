@@ -2310,3 +2310,572 @@ form.card button.link {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* ============================================================
+   RANDOM GENERATOR ROW (DatasetForm)
+   ============================================================ */
+
+.random-gen-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+
+/* ============================================================
+   AUTH FORM
+   ============================================================ */
+
+.auth-form-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.auth-form-header {
+    margin-bottom: 0.25rem;
+}
+
+.auth-form-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 0.35rem;
+}
+
+.auth-form-subtitle {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+
+.auth-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.auth-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.auth-field-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+}
+
+.auth-field-input {
+    background: #090e1a;
+    border: 1px solid var(--border-color);
+    color: #ffffff;
+    padding: 0.75rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.92rem;
+    font-family: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.auth-field-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.auth-field-input::placeholder {
+    color: var(--text-dim);
+}
+
+.auth-error-banner {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    padding: 0.65rem 0.9rem;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.88rem;
+}
+
+.auth-submit-btn {
+    background: var(--primary);
+    color: #ffffff;
+    border: none;
+    padding: 0.8rem;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.auth-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.auth-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.auth-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-dim);
+    font-size: 0.82rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.auth-switch-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 0.65rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.auth-switch-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ============================================================
+   MISSING UTILITY & LAYOUT CLASSES
+   ============================================================ */
+
+.home-main-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.sidebar-top {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-brand-wrapper {
+    cursor: pointer;
+}
+
+.loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.error-banner {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+}
+
+.header-error-banner {
+    background: rgba(239, 68, 68, 0.12);
+    border-top: 1px solid rgba(239, 68, 68, 0.25);
+    color: #f87171;
+    padding: 0.6rem 0;
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+}
+
+.empty-selection {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+}
+
+.muted {
+    color: var(--text-muted);
+}
+
+.text-xs {
+    font-size: 0.72rem;
+}
+
+.text-sm {
+    font-size: 0.82rem;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.monospace {
+    font-family: var(--font-mono);
+}
+
+.datasets-browser-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 1400px;
+}
+
+/* ============================================================
+   RANK BADGE (Completed view)
+   ============================================================ */
+
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.rank-badge.rank-1,
+.rank-1 { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.5); }
+.rank-badge.rank-2,
+.rank-2 { background: rgba(148, 163, 184, 0.2); color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.5); }
+.rank-badge.rank-3,
+.rank-3 { background: rgba(180, 83, 9, 0.2); color: #f97316; border: 1px solid rgba(180, 83, 9, 0.5); }
+.rank-badge.rank-4,
+.rank-4 { background: rgba(255, 255, 255, 0.05); color: var(--text-dim); border: 1px solid rgba(255, 255, 255, 0.06); }
+
+/* ============================================================
+   COMPLETED VIEW LAYOUT
+   ============================================================ */
+
+.completed-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.completed-single-view {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.completed-tab-content {
+    margin-top: 0.5rem;
+}
+
+.completed-table {
+    width: 100%;
+}
+
+.score-cell {
+    font-weight: 700;
+    color: #a5b4fc;
+}
+
+/* ============================================================
+   INSPECT & PAYLOAD
+   ============================================================ */
+
+.inspect-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.payload-box {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.payload-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.details-raw-box {
+    overflow: hidden;
+}
+
+/* ============================================================
+   INPUT DETAILS / LOGS VIEW
+   ============================================================ */
+
+.input-details-view {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.logs-full-view {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.stream-font-bold {
+    font-weight: 700;
+}
+
+/* ============================================================
+   WIN RATE CHART CARD
+   ============================================================ */
+
+.win-rate-chart-card {
+    padding: 1.5rem;
+}
+
+/* ============================================================
+   LEADERBOARDS TABLE
+   ============================================================ */
+
+.global-table {
+    width: 100%;
+}
+
+.leaderboards-table-card {
+    padding: 0.5rem 0;
+}
+
+/* ============================================================
+   ADDITIONAL RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 900px) {
+    .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .filters-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .upload-grid-layout {
+        grid-template-columns: 1fr;
+    }
+    .datasets-grid-layout {
+        grid-template-columns: 1fr;
+    }
+    .completed-summary-stats {
+        grid-template-columns: 1fr;
+    }
+    .quality-grid {
+        grid-template-columns: 1fr;
+    }
+    .quality-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .app-sidebar {
+        display: none;
+    }
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+    .form-fields-row {
+        flex-direction: column;
+    }
+    .race-header-main {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    .race-header-badges {
+        flex-wrap: wrap;
+    }
+    .leaderboards-header-box {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    .wizard-actions-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    .algo-checklist {
+        order: 2;
+    }
+    .btn-wizard-launch {
+        order: 1;
+        width: 100%;
+        justify-content: center;
+    }
+    .problem-types-row {
+        grid-template-columns: 1fr;
+    }
+    .categories-grid {
+        grid-template-columns: 1fr;
+    }
+    .completed-grid-two-column {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   INPUT FOCUS STATES (General)
+   ============================================================ */
+
+.form-text-input:focus,
+.form-json-textarea:focus,
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+/* ============================================================
+   SCROLLBAR STYLING
+   ============================================================ */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================
+   BUTTON TRANSITIONS
+   ============================================================ */
+
+button {
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+/* ============================================================
+   MISSING STREAM STYLES
+   ============================================================ */
+
+.stream-empty {
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    padding: 0.5rem 0;
+}
+
+/* ============================================================
+   ALGO DETAILS CARD
+   ============================================================ */
+
+.algo-details {
+    padding: 1.25rem;
+}
+
+.algo-details h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 0.85rem;
+}
+
+/* ============================================================
+   CHART CARD
+   ============================================================ */
+
+.chart-card {
+    padding: 1.25rem;
+}
+
+/* ============================================================
+   LEADERBOARD CARD
+   ============================================================ */
+
+.leaderboard {
+    padding: 1.25rem;
+}
+
+/* ============================================================
+   RACE ID CODE
+   ============================================================ */
+
+.race-id-code {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+}
+
+/* ============================================================
+   DATASETS BROWSER LIST SECTION
+   ============================================================ */
+
+.datasets-list-col {
+    padding: 1.25rem;
+}
+
+.dataset-details-col {
+    padding: 1.25rem;
+}
+
+/* ============================================================
+   UPLOAD CONTAINER HEADER
+   ============================================================ */
+
+.upload-container-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}

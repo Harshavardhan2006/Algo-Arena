@@ -1,25 +1,37 @@
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/algoarena
-    username: algoarena
-    password: algoarena
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/algoarena}
+    username: ${SPRING_DATASOURCE_USERNAME:algoarena}
+    password: ${SPRING_DATASOURCE_PASSWORD:algoarena}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      connection-timeout: 30000
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  secret: algoarena-dev-secret-change-before-any-deployment-0123456789
+  secret: ${JWT_SECRET:algoarena-dev-secret-change-before-any-deployment-0123456789}
   expiration-ms: 86400000
 
 algoarena:
   execution:
     max-runtime-seconds: 30
     max-time-limit-seconds: 600
-    workers-base-path: ../workers
-    docker-image: algoarena-worker:latest
+    workers-base-path: ${WORKERS_BASE_PATH:../workers}
+    docker-image: ${DOCKER_IMAGE:algoarena-worker:latest}
     memory-limit: 256m
     cpu-limit: "1"
+
+logging:
+  level:
+    com.algoarena: DEBUG
+    org.springframework.security: WARN

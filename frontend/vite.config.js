@@ -9,5 +9,17 @@ export default defineConfig({
             '/api': { target: 'http://localhost:8081', changeOrigin: true },
             '/ws': { target: 'http://localhost:8081', ws: true, changeOrigin: true }
         }
+    },
+    build: {
+        outDir: 'dist',
+        sourcemap: false,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    react: ['react', 'react-dom'],
+                    recharts: ['recharts']
+                }
+            }
+        }
     }
 });
