@@ -1,6 +1,8 @@
 const TOKEN_KEY = 'algoarena_token';
 let unauthorizedHandler = null;
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+
 export function getToken() {
     return localStorage.getItem(TOKEN_KEY);
 }
@@ -32,7 +34,7 @@ async function request(path, options = {}) {
         headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`/api${path}`, { ...options, headers });
+    const response = await fetch(`${API_BASE}/api${path}`, { ...options, headers });
     const text = await response.text();
     const body = text ? parse(text) : null;
 

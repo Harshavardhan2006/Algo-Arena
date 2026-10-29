@@ -11,12 +11,12 @@ import {
 } from 'recharts';
 
 const WIN_RATE_HISTORY = [
-    { month: 'Jan', genetic: 45, branch_bound: 35, dp: 12, greedy: 8 },
-    { month: 'Feb', genetic: 48, branch_bound: 34, dp: 13, greedy: 5 },
-    { month: 'Mar', genetic: 50, branch_bound: 33, dp: 12, greedy: 5 },
-    { month: 'Apr', genetic: 53, branch_bound: 31, dp: 11, greedy: 5 },
-    { month: 'May', genetic: 51, branch_bound: 33, dp: 12, greedy: 4 },
-    { month: 'Jun', genetic: 52.4, branch_bound: 32.2, dp: 11.8, greedy: 3.6 }
+    { month: 'Jan', genetic: 45, branch_bound: 35, sa: 10, lpt: 6, greedy: 4 },
+    { month: 'Feb', genetic: 48, branch_bound: 34, sa: 10, lpt: 5, greedy: 3 },
+    { month: 'Mar', genetic: 50, branch_bound: 33, sa: 9, lpt: 5, greedy: 3 },
+    { month: 'Apr', genetic: 53, branch_bound: 31, sa: 8, lpt: 5, greedy: 3 },
+    { month: 'May', genetic: 51, branch_bound: 33, sa: 9, lpt: 4, greedy: 3 },
+    { month: 'Jun', genetic: 52.4, branch_bound: 32.2, sa: 8.5, lpt: 4.1, greedy: 2.8 }
 ];
 
 const LEADERBOARD_ROWS = [
@@ -33,7 +33,7 @@ const LEADERBOARD_ROWS = [
     {
         rank: 2,
         code: 'branch_bound',
-        name: 'Branch & Bound',
+        name: 'Branch & Bound (Optimal)',
         color: '#06b6d4',
         wins: 112,
         winRate: '32.2%',
@@ -42,22 +42,32 @@ const LEADERBOARD_ROWS = [
     },
     {
         rank: 3,
-        code: 'dp',
-        name: 'Dynamic Programming',
-        color: '#8b5cf6',
-        wins: 41,
-        winRate: '11.8%',
-        avgGap: '6.35%',
+        code: 'sa',
+        name: 'Simulated Annealing',
+        color: '#ec4899',
+        wins: 30,
+        winRate: '8.5%',
+        avgGap: '5.12%',
         totalRuns: 347
     },
     {
         rank: 4,
+        code: 'lpt',
+        name: 'Longest Processing Time (LPT)',
+        color: '#3b82f6',
+        wins: 14,
+        winRate: '4.1%',
+        avgGap: '8.40%',
+        totalRuns: 347
+    },
+    {
+        rank: 5,
         code: 'greedy',
-        name: 'Greedy Heuristic',
+        name: 'Greedy Heuristic (SJF)',
         color: '#f59e0b',
-        wins: 12,
-        winRate: '3.6%',
-        avgGap: '17.92%',
+        wins: 9,
+        winRate: '2.8%',
+        avgGap: '14.92%',
         totalRuns: 347
     }
 ];
@@ -267,9 +277,17 @@ export default function GlobalLeaderboards({ onLaunchRace }) {
                             />
                             <Line
                                 type="monotone"
-                                dataKey="dp"
-                                name="Dynamic Programming"
-                                stroke="#8b5cf6"
+                                dataKey="sa"
+                                name="Simulated Annealing"
+                                stroke="#ec4899"
+                                strokeWidth={2.5}
+                                dot={{ r: 4 }}
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="lpt"
+                                name="Longest Processing Time"
+                                stroke="#3b82f6"
                                 strokeWidth={2.5}
                                 dot={{ r: 4 }}
                             />

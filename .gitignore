@@ -1,6 +1,55 @@
+# ============================================================
+# AlgoArena .gitignore
+# ============================================================
+
+# Log files & Terminal dumps
+*.log
+*.tmp
+backend-*.txt
+*-err.txt
+*-out.txt
+
+# Maven build artifacts
 target/
+**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+
+# Frontend build & dependencies
 node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & credentials (keep .env.example)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+
+# IDEs & System files
 .idea/
 .vscode/
-*.log
-dist/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Subagent / tool execution artifacts
+.system_generated/

@@ -3,6 +3,18 @@ import { Client } from '@stomp/stompjs';
 import { getRaceEvents, getRaceState, startRace } from '../api.js';
 
 function socketUrl() {
+    const wsBase = import.meta.env.VITE_WS_BASE_URL;
+    if (wsBase) {
+        return `${wsBase.replace(/\/+$/, '')}/ws/websocket`;
+    }
+    const apiBase = import.meta.env.VITE_API_BASE_URL;
+    if (apiBase) {
+        try {
+            const url = new URL(apiBase);
+            const scheme = url.protocol === 'https:' ? 'wss' : 'ws';
+            return `${scheme}://${url.host}/ws/websocket`;
+        } catch {}
+    }
     const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     return `${scheme}://${window.location.host}/ws/websocket`;
 }
