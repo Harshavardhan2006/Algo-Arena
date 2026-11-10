@@ -1,19 +1,19 @@
-# AlgoArena 🏁
+# AlgoArena 
 
 **Enterprise-Grade Real-Time Algorithmic Benchmarking & Telemetry Platform**
 
 *A Major Final-Year Capstone Project in Distributed Systems & Empirical Algorithmics*
 
-[Architecture](https://www.google.com/search?q=%23system-architecture) •
-[Features](https://www.google.com/search?q=%23key-features) •
-[Algorithms](https://www.google.com/search?q=%23supported-algorithms--paradigms) •
-[API Reference](https://www.google.com/search?q=%23api-specification) •
-[Cloud Deployment](https://www.google.com/search?q=%23free-cloud-deployment) •
-[Getting Started](https://www.google.com/search?q=%23getting-started-local)
+[Architecture]•
+[Features]•
+[Algorithms]•
+[API Reference]•
+[Cloud Deployment]•
+[Getting Started]
 
 ---
 
-## 📌 Executive Summary
+## Executive Summary
 
 Theoretical asymptotic complexity ($\mathcal{O}$-notation) often obscures the empirical wall-clock efficiency, cache dynamics, and memory overhead of algorithms operating on real-world problem instances.
 
@@ -21,7 +21,7 @@ Theoretical asymptotic complexity ($\mathcal{O}$-notation) often obscures the em
 
 ---
 
-## 🏛 System Architecture
+## System Architecture
 
 The platform follows an asynchronous, event-driven architecture built around strict process isolation, robust fallback mechanisms, and sub-second telemetry broadcast:
 
@@ -78,7 +78,7 @@ flowchart TD
 
 ---
 
-## ⚡ Key Features
+## Key Features
 
 * **Real-Time WebSocket Telemetry**: Stream real-time score updates, node iterations, and active compute timestamps directly to the browser via STOMP over WebSockets.
 * **Dynamic Convergence Curves**: Interactive step-after convergence tracking showing optimality progress over wall-clock milliseconds.
@@ -91,7 +91,7 @@ flowchart TD
 
 ---
 
-## 🧬 Supported Algorithms & Paradigms
+## Supported Algorithms & Paradigms
 
 For the NP-hard **Multiprocessor Makespan Scheduling Problem** ($P \parallel C_{\max}$):
 
@@ -105,7 +105,7 @@ For the NP-hard **Multiprocessor Makespan Scheduling Problem** ($P \parallel C_{
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Frontend
 
@@ -131,7 +131,7 @@ For the NP-hard **Multiprocessor Makespan Scheduling Problem** ($P \parallel C_{
 
 ---
 
-## 🔌 API Specification
+## API Specification
 
 ### Authentication
 
@@ -163,7 +163,7 @@ For the NP-hard **Multiprocessor Makespan Scheduling Problem** ($P \parallel C_{
 
 ---
 
-## 🚀 Getting Started (Local)
+## Getting Started (Local)
 
 ### Prerequisites
 
@@ -207,7 +207,7 @@ npm run dev
 
 ---
 
-## 🌐 Free Cloud Deployment
+## Free Cloud Deployment
 
 AlgoArena is configured for 100% free cloud hosting:
 
@@ -219,7 +219,7 @@ AlgoArena is configured for 100% free cloud hosting:
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 AlgoArena/
@@ -257,7 +257,7 @@ AlgoArena/
 
 ---
 
-## 🎓 Capstone Project Attribution
+## Capstone Project Attribution
 
 * **Project Title**: AlgoArena — Real-Time Algorithmic Benchmarking Platform
 * **Candidate**: Harshavardhan ([@Harshavardhan2006](https://github.com/Harshavardhan2006))
