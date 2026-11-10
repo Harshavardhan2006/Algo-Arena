@@ -51,5 +51,16 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# Local JDKs, JREs & Runtimes
+*jdk*/
+*jre*/
+oracleJdk*/
+**/oracleJdk*/
+frontend/oracleJdk-27/
+*.zip
+*.tar.gz
+*.exe
+*.dll
+
 # Subagent / tool execution artifacts
 .system_generated/
