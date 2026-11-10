@@ -106,10 +106,13 @@ export function useRace(raceId) {
 
         client = new Client({
             brokerURL: socketUrl(),
-            reconnectDelay: 0,
+            reconnectDelay: 3000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
             onConnect: () => {
                 if (!active) return;
                 setConnected(true);
+                setError(null);
                 client.subscribe(`/topic/race/${raceId}`, (message) => {
                     try {
                         const parsed = JSON.parse(message.body);
@@ -126,11 +129,20 @@ export function useRace(raceId) {
                     if (active) setError(e.message);
                 });
             },
+            onDisconnect: () => {
+                if (active) setConnected(false);
+            },
+            onWebSocketClose: () => {
+                if (active) setConnected(false);
+            },
             onStompError: (frame) => {
                 if (active) setError(frame.headers?.message || 'STOMP error');
             },
             onWebSocketError: () => {
-                if (active) setError('could not reach the live stream');
+                if (active) {
+                    setConnected(false);
+                    setError('could not reach the live stream; attempting reconnection...');
+                }
             }
         });
 

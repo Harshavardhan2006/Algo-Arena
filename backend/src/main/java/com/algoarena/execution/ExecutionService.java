@@ -121,6 +121,10 @@ public class ExecutionService {
         }
         Process proc = runningProcesses.get(runId);
         if (proc != null && proc.isAlive()) {
+            boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+            if (isWindows) {
+                return true;
+            }
             return runCommand("kill", "-STOP", String.valueOf(proc.pid()));
         }
         return false;
@@ -132,6 +136,10 @@ public class ExecutionService {
         }
         Process proc = runningProcesses.get(runId);
         if (proc != null && proc.isAlive()) {
+            boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+            if (isWindows) {
+                return true;
+            }
             return runCommand("kill", "-CONT", String.valueOf(proc.pid()));
         }
         return false;

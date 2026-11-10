@@ -42,7 +42,14 @@ async function request(path, options = {}) {
         if (token && !path.startsWith('/auth') && (response.status === 401 || response.status === 403)) {
             if (unauthorizedHandler) unauthorizedHandler();
         }
-        const message = typeof body === 'string' && body ? body : `request failed (${response.status})`;
+        let message;
+        if (body && typeof body === 'object') {
+            message = body.message || body.error || JSON.stringify(body);
+        } else if (typeof body === 'string' && body) {
+            message = body;
+        } else {
+            message = `request failed (${response.status})`;
+        }
         throw new Error(message);
     }
     return body;

@@ -11,4 +11,5 @@ COPY --from=build /build/target/backend-0.1.0.jar ./app.jar
 COPY workers /app/workers
 COPY workers /workers
 EXPOSE 8080
+ENV PORT=8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
