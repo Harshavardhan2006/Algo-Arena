@@ -11,7 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,13 +33,22 @@ public class AuthController {
         this.authenticationManager = authenticationManager;
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        String errorMessage = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : error.getField() + " is invalid")
+                .findFirst()
+                .orElse("Invalid request payload");
+        return ResponseEntity.badRequest().body(Map.of("message", errorMessage, "error", errorMessage));
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            return ResponseEntity.badRequest().body("username already taken");
+            return ResponseEntity.badRequest().body(Map.of("message", "Username already taken", "error", "Username already taken"));
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest().body("email already registered");
+            return ResponseEntity.badRequest().body(Map.of("message", "Email already registered", "error", "Email already registered"));
         }
 
         User user = new User();
@@ -54,7 +66,7 @@ public class AuthController {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
         } catch (Exception e) {
-            return ResponseEntity.status(401).body("invalid credentials");
+            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials", "error", "Invalid credentials"));
         }
 
         return ResponseEntity.ok(new AuthResponse(jwtService.generateToken(request.getUsername()), request.getUsername()));

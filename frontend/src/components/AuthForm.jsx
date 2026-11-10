@@ -12,6 +12,14 @@ export default function AuthForm({ onAuthenticated }) {
     async function submit(event) {
         event.preventDefault();
         setError(null);
+        if (username.trim().length < 3) {
+            setError('Username must be at least 3 characters');
+            return;
+        }
+        if (mode === 'register' && password.length < 6) {
+            setError('Password must be at least 6 characters');
+            return;
+        }
         setBusy(true);
         try {
             const data = mode === 'login'
@@ -74,8 +82,9 @@ export default function AuthForm({ onAuthenticated }) {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder={mode === 'register' ? 'At least 8 characters' : 'Enter your password'}
+                        placeholder={mode === 'register' ? 'At least 6 characters' : 'Enter your password'}
                         autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                        minLength={mode === 'register' ? 6 : undefined}
                         required
                     />
                 </div>
