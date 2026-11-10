@@ -6,7 +6,6 @@ import com.algoarena.model.RunEvent;
 import com.algoarena.repository.RaceRepository;
 import com.algoarena.repository.RunEventRepository;
 import com.algoarena.repository.RunRepository;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -221,6 +220,7 @@ public class ExecutionService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Async("raceExecutor")
     public void executeRun(Long runId) {
         Run run = runRepository.findById(runId).orElseThrow();
@@ -431,7 +431,7 @@ public class ExecutionService {
                     Double progress = event.hasNonNull("progress") ? event.get("progress").asDouble() : null;
                     JsonNode statsNode = event.get("stats");
                     Map<String, Object> stats = (statsNode != null && statsNode.isObject())
-                            ? objectMapper.convertValue(statsNode, new TypeReference>() {})
+                            ? (Map<String, Object>) objectMapper.convertValue(statsNode, Map.class)
                             : null;
                     JsonNode payload = event.get("payload");
 
@@ -449,7 +449,7 @@ public class ExecutionService {
                         computeMs = compute;
                         finalAt = System.currentTimeMillis();
                         if (payload != null) {
-                            finalPayload = objectMapper.convertValue(payload, new TypeReference>() {});
+                            finalPayload = (Map<String, Object>) objectMapper.convertValue(payload, Map.class);
                         }
                     }
 
