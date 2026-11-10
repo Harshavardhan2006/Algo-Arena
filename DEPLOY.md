@@ -40,10 +40,9 @@ You can choose any of these free managed PostgreSQL providers:
 2. Connect your GitHub repository: `https://github.com/Harshavardhan2006/Algo-Arena` (or your fork).
 3. Set the following configuration:
    - **Name**: `algoarena-backend`
-   - **Runtime**: `Java` (or `Docker`)
-   - **Root Directory**: `backend`
-   - **Build Command**: `mvn clean package -DskipTests`
-   - **Start Command**: `java -jar target/backend-0.1.0.jar`
+   - **Runtime**: `Docker`
+   - **Root Directory**: leave blank (the repository root)
+   - Render will build using the root `Dockerfile`; do not set separate build or start commands.
 4. Under **Environment Variables**, add:
    ```env
    SPRING_DATASOURCE_URL=jdbc:postgresql://<your-db-host>:5432/<your-db-name>?sslmode=require
