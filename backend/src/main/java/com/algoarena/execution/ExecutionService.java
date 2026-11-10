@@ -9,6 +9,8 @@ import com.algoarena.repository.RunRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -19,6 +21,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,6 +38,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class ExecutionService {
+
+    private static final Logger log = LoggerFactory.getLogger(ExecutionService.class);
 
     private static class PauseInterval {
         final long start;
@@ -56,12 +61,18 @@ public class ExecutionService {
     private final ObjectMapper objectMapper;
 
     private final ConcurrentHashMap<Long, String> runningContainers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Process> runningProcesses = new ConcurrentHashMap<>();
     private final Set<Long> cancelledRaces = ConcurrentHashMap.newKeySet();
     private final Set<Long> pausedRaces = ConcurrentHashMap.newKeySet();
     private final ConcurrentMap<Long, RunPauseState> pauseStates = new ConcurrentHashMap<>();
 
+    private volatile Boolean dockerAvailable = null;
+
     @Value("${algoarena.execution.max-runtime-seconds}")
     private long maxRuntimeSeconds;
+
+    @Value("${algoarena.execution.workers-base-path:../workers}")
+    private String workersBasePath;
 
     @Value("${algoarena.execution.docker-image}")
     private String dockerImage;
@@ -82,7 +93,19 @@ public class ExecutionService {
         this.objectMapper = objectMapper;
     }
 
-    private boolean runDockerCommand(String... args) {
+    private boolean isDockerAvailable() {
+        if (dockerAvailable == null) {
+            synchronized (this) {
+                if (dockerAvailable == null) {
+                    dockerAvailable = runCommand("docker", "info");
+                    log.info("ExecutionService initialized: Docker available = {}", dockerAvailable);
+                }
+            }
+        }
+        return dockerAvailable;
+    }
+
+    private boolean runCommand(String... args) {
         try {
             Process process = new ProcessBuilder(args)
                     .redirectErrorStream(true)
@@ -93,8 +116,46 @@ public class ExecutionService {
         }
     }
 
-    private void killContainer(String name) {
-        runDockerCommand("docker", "rm", "-f", name);
+    private boolean pauseWorker(Long runId, String container) {
+        if (isDockerAvailable() && container != null) {
+            return runCommand("docker", "pause", container);
+        }
+        Process proc = runningProcesses.get(runId);
+        if (proc != null && proc.isAlive()) {
+            return runCommand("kill", "-STOP", String.valueOf(proc.pid()));
+        }
+        return false;
+    }
+
+    private boolean unpauseWorker(Long runId, String container) {
+        if (isDockerAvailable() && container != null) {
+            return runCommand("docker", "unpause", container);
+        }
+        Process proc = runningProcesses.get(runId);
+        if (proc != null && proc.isAlive()) {
+            return runCommand("kill", "-CONT", String.valueOf(proc.pid()));
+        }
+        return false;
+    }
+
+    private void killWorker(Long runId, String container) {
+        if (isDockerAvailable() && container != null) {
+            runCommand("docker", "rm", "-f", container);
+        }
+        Process proc = runningProcesses.get(runId);
+        if (proc != null && proc.isAlive()) {
+            proc.destroyForcibly();
+        }
+    }
+
+    private Path resolveWorkerScript(String entrypoint) {
+        Path p1 = Paths.get(workersBasePath, entrypoint).toAbsolutePath().normalize();
+        if (Files.exists(p1)) return p1;
+        Path p2 = Paths.get("workers", entrypoint).toAbsolutePath().normalize();
+        if (Files.exists(p2)) return p2;
+        Path p3 = Paths.get("../workers", entrypoint).toAbsolutePath().normalize();
+        if (Files.exists(p3)) return p3;
+        return p1;
     }
 
     private long activeElapsedMs(Long runId, long beginMillis) {
@@ -114,12 +175,10 @@ public class ExecutionService {
         for (Run run : runRepository.findByRaceId(raceId)) {
             Long runId = run.getId();
             String container = runningContainers.get(runId);
-            if (container != null) {
-                if (runDockerCommand("docker", "pause", container)) {
-                    RunPauseState state = pauseStates.get(runId);
-                    if (state != null && state.pausedSince == 0L) {
-                        state.pausedSince = System.currentTimeMillis();
-                    }
+            if (pauseWorker(runId, container)) {
+                RunPauseState state = pauseStates.get(runId);
+                if (state != null && state.pausedSince == 0L) {
+                    state.pausedSince = System.currentTimeMillis();
                 }
             }
         }
@@ -131,9 +190,9 @@ public class ExecutionService {
             Long runId = run.getId();
             String container = runningContainers.get(runId);
             RunPauseState state = pauseStates.get(runId);
-            if (container != null && state != null && state.pausedSince > 0L) {
+            if (state != null && state.pausedSince > 0L) {
                 long since = state.pausedSince;
-                if (runDockerCommand("docker", "unpause", container)) {
+                if (unpauseWorker(runId, container)) {
                     long now = System.currentTimeMillis();
                     state.totalPausedMs.addAndGet(now - since);
                     synchronized (state.closedIntervals) {
@@ -157,10 +216,8 @@ public class ExecutionService {
         cancelledRaces.add(raceId);
         pausedRaces.remove(raceId);
         for (Run run : runRepository.findByRaceId(raceId)) {
-            String container = runningContainers.get(run.getId());
-            if (container != null) {
-                killContainer(container);
-            }
+            Long runId = run.getId();
+            killWorker(runId, runningContainers.get(runId));
         }
     }
 
@@ -221,7 +278,6 @@ public class ExecutionService {
         Map<String, Object> finalPayload = null;
         Long finalAt = null;
         AtomicBoolean timedOut = new AtomicBoolean(false);
-        String failure = null;
 
         int keptCount = 1;
         Double lastKeptScore = null;
@@ -234,24 +290,34 @@ public class ExecutionService {
             Files.writeString(inputFile, json, StandardCharsets.UTF_8);
 
             String containerName = "algoarena-" + runId + "-" + UUID.randomUUID().toString().substring(0, 8);
-            ProcessBuilder builder = new ProcessBuilder(
-                    "docker", "run", "--rm",
-                    "--name", containerName,
-                    "--memory", memoryLimit,
-                    "--memory-swap", memoryLimit,
-                    "--cpus", cpuLimit,
-                    "--pids-limit", "64",
-                    "--network", "none",
-                    "--read-only",
-                    "--tmpfs", "/tmp",
-                    "--cap-drop", "ALL",
-                    "--security-opt", "no-new-privileges",
-                    "-v", inputFile.toAbsolutePath() + ":/input.json:ro",
-                    dockerImage,
-                    "node", "/app/workers/" + run.getAlgorithm().getWorkerEntrypoint(), "/input.json");
+            ProcessBuilder builder;
+            if (isDockerAvailable()) {
+                builder = new ProcessBuilder(
+                        "docker", "run", "--rm",
+                        "--name", containerName,
+                        "--memory", memoryLimit,
+                        "--memory-swap", memoryLimit,
+                        "--cpus", cpuLimit,
+                        "--pids-limit", "64",
+                        "--network", "none",
+                        "--read-only",
+                        "--tmpfs", "/tmp",
+                        "--cap-drop", "ALL",
+                        "--security-opt", "no-new-privileges",
+                        "-v", inputFile.toAbsolutePath() + ":/input.json:ro",
+                        dockerImage,
+                        "node", "/app/workers/" + run.getAlgorithm().getWorkerEntrypoint(), "/input.json");
+                runningContainers.put(runId, containerName);
+            } else {
+                Path scriptPath = resolveWorkerScript(run.getAlgorithm().getWorkerEntrypoint());
+                builder = new ProcessBuilder(
+                        "node",
+                        scriptPath.toString(),
+                        inputFile.toAbsolutePath().toString());
+            }
             builder.redirectErrorStream(true);
-            runningContainers.put(runId, containerName);
             pauseStates.put(runId, new RunPauseState());
+
             if (cancelledRaces.contains(raceId)) {
                 run.setStatus("cancelled");
                 run.setCompletedAt(Instant.now());
@@ -270,7 +336,9 @@ public class ExecutionService {
                 pauseStates.remove(runId);
                 return;
             }
+
             Process process = builder.start();
+            runningProcesses.put(runId, process);
 
             long timeLimit = run.getRace().getTimeLimitSeconds();
             Thread watchdog = new Thread(() -> {
@@ -283,7 +351,7 @@ public class ExecutionService {
                         if (cancelledRaces.contains(raceId)) {
                             long now = System.currentTimeMillis();
                             if (now - lastKillAttempt >= 500) {
-                                killContainer(containerName);
+                                killWorker(runId, containerName);
                                 lastKillAttempt = now;
                             }
                         } else {
@@ -292,7 +360,7 @@ public class ExecutionService {
                                     long now = System.currentTimeMillis();
                                     if (now - lastPauseAttempt >= 300) {
                                         lastPauseAttempt = now;
-                                        if (runDockerCommand("docker", "pause", containerName)) {
+                                        if (pauseWorker(runId, containerName)) {
                                             pauseState.pausedSince = System.currentTimeMillis();
                                         }
                                     }
@@ -300,7 +368,7 @@ public class ExecutionService {
                             } else {
                                 if (pauseState != null && pauseState.pausedSince > 0L) {
                                     long since = pauseState.pausedSince;
-                                    if (runDockerCommand("docker", "unpause", containerName)) {
+                                    if (unpauseWorker(runId, containerName)) {
                                         long now = System.currentTimeMillis();
                                         pauseState.totalPausedMs.addAndGet(now - since);
                                         synchronized (pauseState.closedIntervals) {
@@ -319,8 +387,7 @@ public class ExecutionService {
 
                             if (activeTime > timeLimit * 1000L) {
                                 timedOut.set(true);
-                                killContainer(containerName);
-                                process.destroyForcibly();
+                                killWorker(runId, containerName);
                                 break;
                             }
                         }
@@ -341,6 +408,7 @@ public class ExecutionService {
                     try {
                         event = objectMapper.readTree(line);
                     } catch (Exception notJson) {
+                        log.warn("Worker [{}] non-JSON output: {}", code, line);
                         continue;
                     }
                     if (event == null || !event.isObject()) {
@@ -363,7 +431,7 @@ public class ExecutionService {
                     Double progress = event.hasNonNull("progress") ? event.get("progress").asDouble() : null;
                     JsonNode statsNode = event.get("stats");
                     Map<String, Object> stats = (statsNode != null && statsNode.isObject())
-                            ? objectMapper.convertValue(statsNode, new TypeReference<Map<String, Object>>() {})
+                            ? objectMapper.convertValue(statsNode, new TypeReference>() {})
                             : null;
                     JsonNode payload = event.get("payload");
 
@@ -381,7 +449,7 @@ public class ExecutionService {
                         computeMs = compute;
                         finalAt = System.currentTimeMillis();
                         if (payload != null) {
-                            finalPayload = objectMapper.convertValue(payload, new TypeReference<Map<String, Object>>() {});
+                            finalPayload = objectMapper.convertValue(payload, new TypeReference>() {});
                         }
                     }
 
@@ -474,6 +542,7 @@ public class ExecutionService {
                 send(raceId, new RunProgressEvent(event.getId(), runId, code, "cancelled", lastIteration, lastScore,
                         elapsed, null, null, null));
             } else if (exitCode != 0 || !sawFinal) {
+                log.error("Run {} ({}) failed with exitCode={}, sawFinal={}", runId, code, exitCode, sawFinal);
                 run.setStatus("failed");
                 long elapsed = activeElapsedMs(runId, begin);
                 run.setRuntimeMs(elapsed);
@@ -519,7 +588,7 @@ public class ExecutionService {
                 run.setResultOutput(finalPayload);
             }
         } catch (Exception e) {
-            failure = e.getMessage();
+            log.error("Run {} ({}) threw exception: {}", runId, code, e.getMessage(), e);
             long elapsed = activeElapsedMs(runId, begin);
             if (cancelledRaces.contains(raceId) && !sawFinal) {
                 run.setStatus("cancelled");
@@ -559,6 +628,7 @@ public class ExecutionService {
             }
             pauseStates.remove(runId);
             runningContainers.remove(runId);
+            runningProcesses.remove(runId);
             run.setCompletedAt(Instant.now());
             runRepository.save(run);
             if (inputFile != null) {
